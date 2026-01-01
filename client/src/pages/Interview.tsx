@@ -7,10 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useState, useRef, useEffect, useMemo } from "react";
-import { Send, User, Bot, Star, AlertCircle, CheckCircle2, LogOut, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Send, User, Bot, Star, AlertCircle, CheckCircle2, LogOut, Loader2, Info, Github } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Interview() {
@@ -52,7 +51,8 @@ export default function Interview() {
       return res.json();
     },
     onSuccess: () => {
-      setLocation(`/summary/${id}`);
+      // Use window.location.href for a hard navigation to ensure fresh data
+      window.location.href = `/summary/${id}`;
     },
   });
 
@@ -61,16 +61,6 @@ export default function Interview() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, mutation.isPending]);
-
-  const stats = useMemo(() => {
-    const feedbackMessages = messages.filter(m => m.role === "candidate" && m.feedback);
-    if (feedbackMessages.length === 0) return { avgRating: 0, count: 0 };
-    const total = feedbackMessages.reduce((sum, m) => sum + (m.feedback?.rating || 0), 0);
-    return {
-      avgRating: (total / feedbackMessages.length).toFixed(1),
-      count: feedbackMessages.length
-    };
-  }, [messages]);
 
   return (
     <div className="h-screen bg-background flex flex-col">
@@ -243,22 +233,41 @@ export default function Interview() {
 
         <aside className="hidden lg:flex w-80 border-l bg-card/30 flex-col p-6 space-y-6">
           <div className="space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Session Stats</h3>
-            <div className="grid gap-3">
-              <Card className="bg-primary/5 border-none shadow-none p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold">Average Rating</span>
-                  <Badge variant="outline" className="bg-background">{stats.count > 0 ? `${stats.avgRating}/10` : "—"}</Badge>
+            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <Info className="w-4 h-4" />
+              Project Context
+            </h3>
+            <Card className="bg-muted/30 border-none shadow-none p-4 space-y-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Title</p>
+                <p className="text-sm font-medium">{interview?.title}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Description</p>
+                <p className="text-xs text-muted-foreground line-clamp-6 leading-relaxed">
+                  {interview?.description}
+                </p>
+              </div>
+              {interview?.githubLink && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Resources</p>
+                  <a 
+                    href={interview.githubLink} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-xs text-primary hover:underline"
+                  >
+                    <Github className="w-3 h-3" />
+                    Source Code
+                  </a>
                 </div>
-                <Progress value={Number(stats.avgRating) * 10} className="h-1.5" />
-                <p className="text-[10px] text-muted-foreground mt-2 text-center uppercase tracking-tighter">Based on {stats.count} responses</p>
-              </Card>
-            </div>
+              )}
+            </Card>
           </div>
           
           <div className="flex-1 overflow-auto space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Interviewer Note</h3>
-            <p className="text-sm text-muted-foreground italic leading-relaxed">
+            <p className="text-sm text-muted-foreground italic leading-relaxed border-l-2 border-primary/20 pl-4 py-1">
               "Focus on explaining the 'why' behind your decisions. Be ready for deep dives into failure scenarios and trade-offs."
             </p>
           </div>
