@@ -1,0 +1,53 @@
+Build a full-fledged interactive web application that simulates a real technical interview focused on user projects. The application should begin by collecting three inputs from the user: (1) Project Title (mandatory), (2) Detailed Project Explanation (mandatory), and (3) Optional Project Reference Link (GitHub repository URL or Google Drive ZIP link). After submission, the system should dynamically analyze the project context and start an interviewer-style conversation, asking progressively deeper and more realistic questions exactly as a human interviewer would.
+
+The interview should start with high-level questions (project overview, motivation, problem statement), then gradually move into architecture, design decisions, data flow, algorithms, trade-offs, edge cases, scalability, performance, security, testing, limitations, failure scenarios, and future improvements. If a project link is provided, intelligently extract additional context from it (when accessible) to ask more specific and challenging questions; if the link is invalid, inaccessible, or empty, gracefully fall back to the user’s written explanation without breaking the flow.
+
+After every answer given by the user, the system must:
+
+1. Rate the answer on a clear scale (e.g., 0–10 or Poor / Average / Good / Excellent),
+2. Provide concise, constructive feedback explaining what was good and what was missing,
+3. Show a strong sample or corrected answer that an interviewer would expect,
+4. Highlight common mistakes candidates make for similar questions so the user avoids them in real interviews.
+
+The interview flow should be adaptive:
+
+* If the user gives a weak or incomplete answer, ask follow-up probing questions
+* If the user gives a strong answer, increase difficulty and depth
+* If the user contradicts themselves, politely challenge the inconsistency like a real interviewer
+* If the user says “I don’t know,” provide a teaching moment and then move forward naturally
+
+The system must handle all edge cases, including:
+
+* Very short or vague project descriptions
+* Overly long explanations (summarize intelligently)
+* Non-technical projects (adjust question style accordingly)
+* Invalid or broken links
+* Repeated or copied answers
+* Users trying to skip questions
+* Abrupt session exits (resume interview smoothly if reopened)
+
+The UI must feel premium and interview-like, with:
+
+* A clean, modern layout
+* Clear separation between interviewer questions, user answers, ratings, and feedback
+* Subtle animations and smooth transitions
+* Visual indicators for progress, difficulty level, and performance trend
+* Mobile-friendly and accessible design
+
+The UX must be frictionless:
+
+* Minimal clicks to start
+* Keyboard-friendly interactions
+* Clear instructions but no clutter
+* Calm, professional interviewer tone (not robotic, not casual)
+* Fast response times and graceful loading states
+
+At the end of the interview, generate a detailed performance summary, including:
+
+* Overall interview score
+* Strengths and weak areas
+* Topics to revise before real interviews
+* Suggested improvements to the project explanation itself
+* Optional downloadable interview report
+
+Ensure the system is robust, fault-tolerant, secure, and scalable, with clear separation of logic, clean state handling, and easy extensibility for adding more interview styles later (e.g., system design interview, behavioral interview). The final experience should closely mimic a real project-based technical interview, making users measurably better prepared for actual interviews.
