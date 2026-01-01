@@ -244,7 +244,7 @@ export default function Interview() {
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Description</p>
-                <p className="text-xs text-muted-foreground line-clamp-6 leading-relaxed">
+                <p className="text-xs text-muted-foreground leading-relaxed">
                   {interview?.description}
                 </p>
               </div>
