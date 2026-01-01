@@ -4,15 +4,16 @@ import { apiRequest } from "@/lib/queryClient";
 import { api, buildUrl } from "@shared/routes";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Award, Target, BookOpen, Wrench, RefreshCw, Trophy, AlertTriangle, ArrowRight } from "lucide-react";
+import { Award, BookOpen, Wrench, RefreshCw, Trophy, AlertTriangle, ArrowRight, Download } from "lucide-react";
 import { motion } from "framer-motion";
 import confetti from "canvas-confetti";
 import { useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Summary() {
   const { id } = useParams();
+  const { toast } = useToast();
 
   const { data: interview } = useQuery({
     queryKey: [api.interviews.get.path, { id }],
@@ -33,6 +34,24 @@ export default function Summary() {
     }
   }, [interview?.overallScore]);
 
+  const handleDownload = () => {
+    toast({
+      title: "Generating PDF...",
+      description: "Your interview report is being prepared. It will download shortly.",
+    });
+    
+    // Mock PDF generation and download
+    setTimeout(() => {
+      const element = document.createElement("a");
+      const file = new Blob(["Interview Report for " + interview?.title + "\nOverall Score: " + interview?.overallScore + "%"], {type: 'text/plain'});
+      element.href = URL.createObjectURL(file);
+      element.download = `interview-report-${id}.txt`;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+    }, 1500);
+  };
+
   if (!interview || !interview.summary) return null;
 
   const summary = interview.summary as any;
@@ -40,7 +59,6 @@ export default function Summary() {
   return (
     <div className="min-h-screen bg-background p-6 md:p-12">
       <div className="max-w-4xl mx-auto space-y-12">
-        {/* Hero Score */}
         <div className="text-center space-y-6">
           <motion.div
             initial={{ scale: 0.5, opacity: 0 }}
@@ -57,7 +75,6 @@ export default function Summary() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Strengths */}
           <Card className="border-none bg-emerald-50/50 dark:bg-emerald-950/20 shadow-none">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
@@ -77,7 +94,6 @@ export default function Summary() {
             </CardContent>
           </Card>
 
-          {/* Weaknesses */}
           <Card className="border-none bg-rose-50/50 dark:bg-rose-950/20 shadow-none">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-rose-700 dark:text-rose-400">
@@ -103,9 +119,9 @@ export default function Summary() {
             <BookOpen className="w-6 h-6 text-primary" />
             Recommended Revision
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="flex flex-wrap gap-3">
             {summary.revision_topics.map((t: string, i: number) => (
-              <Badge key={i} variant="secondary" className="h-10 text-sm justify-center font-medium bg-card border shadow-sm">
+              <Badge key={i} variant="secondary" className="px-4 py-2 text-sm font-medium bg-card border shadow-sm rounded-full">
                 {t}
               </Badge>
             ))}
@@ -141,8 +157,13 @@ export default function Summary() {
               Try Another Project
             </Link>
           </Button>
-          <Button variant="outline" className="flex-1 h-14 text-lg font-bold rounded-2xl border-2">
-            Download PDF Report
+          <Button 
+            variant="outline" 
+            className="flex-1 h-14 text-lg font-bold rounded-2xl border-2"
+            onClick={handleDownload}
+          >
+            <Download className="w-5 h-5 mr-2" />
+            Download Report
             <ArrowRight className="w-5 h-5 ml-2" />
           </Button>
         </div>

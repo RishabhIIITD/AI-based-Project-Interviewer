@@ -9,8 +9,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useState, useRef, useEffect } from "react";
-import { Send, User, Bot, Star, AlertCircle, CheckCircle2, ChevronRight, LogOut } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Send, User, Bot, Star, AlertCircle, CheckCircle2, LogOut, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Interview() {
@@ -62,12 +62,18 @@ export default function Interview() {
     }
   }, [messages, mutation.isPending]);
 
-  const lastInterviewerMessage = [...messages].reverse().find(m => m.role === "interviewer");
-  const lastCandidateMessage = [...messages].reverse().find(m => m.role === "candidate");
+  const stats = useMemo(() => {
+    const feedbackMessages = messages.filter(m => m.role === "candidate" && m.feedback);
+    if (feedbackMessages.length === 0) return { avgRating: 0, count: 0 };
+    const total = feedbackMessages.reduce((sum, m) => sum + (m.feedback?.rating || 0), 0);
+    return {
+      avgRating: (total / feedbackMessages.length).toFixed(1),
+      count: feedbackMessages.length
+    };
+  }, [messages]);
 
   return (
     <div className="h-screen bg-background flex flex-col">
-      {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur px-6 py-4 flex items-center justify-between z-10">
         <div className="flex items-center gap-4">
           <div className="p-2 bg-primary/10 rounded-lg text-primary">
@@ -81,14 +87,23 @@ export default function Interview() {
             </div>
           </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => completeMutation.mutate()} className="text-destructive hover:bg-destructive/10">
-          <LogOut className="w-4 h-4 mr-2" />
-          End Interview
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          disabled={completeMutation.isPending}
+          onClick={() => completeMutation.mutate()} 
+          className="text-destructive hover:bg-destructive/10"
+        >
+          {completeMutation.isPending ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <LogOut className="w-4 h-4 mr-2" />
+          )}
+          {completeMutation.isPending ? "Generating Report..." : "End Interview"}
         </Button>
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Main Chat Area */}
         <div className="flex-1 flex flex-col min-w-0">
           <ScrollArea ref={scrollRef} className="flex-1 p-6">
             <div className="max-w-3xl mx-auto space-y-8">
@@ -114,7 +129,6 @@ export default function Interview() {
                         <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                       </div>
                       
-                      {/* Feedback for Candidate Answers */}
                       {msg.role === "candidate" && msg.feedback && (
                         <motion.div
                           initial={{ opacity: 0, scale: 0.95 }}
@@ -165,7 +179,7 @@ export default function Interview() {
                 ))}
               </AnimatePresence>
               
-              {mutation.isPending && (
+              {(mutation.isPending || completeMutation.isPending) && (
                 <div className="flex gap-4">
                   <Avatar className="h-10 w-10 border-2 border-muted">
                     <AvatarFallback className="bg-muted text-muted-foreground">
@@ -178,14 +192,15 @@ export default function Interview() {
                       <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
                       <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
                     </div>
-                    <span className="text-sm text-muted-foreground italic">Analyzing answer...</span>
+                    <span className="text-sm text-muted-foreground italic">
+                      {completeMutation.isPending ? "Finalizing performance report..." : "Analyzing answer..."}
+                    </span>
                   </div>
                 </div>
               )}
             </div>
           </ScrollArea>
 
-          {/* Input Bar */}
           <div className="p-6 border-t bg-card/50 backdrop-blur z-10">
             <div className="max-w-3xl mx-auto flex gap-4">
               <div className="flex-1 relative">
@@ -197,15 +212,16 @@ export default function Interview() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
-                      if (answer.trim() && !mutation.isPending) mutation.mutate(answer);
+                      if (answer.trim() && !mutation.isPending && !completeMutation.isPending) mutation.mutate(answer);
                     }
                   }}
+                  disabled={mutation.isPending || completeMutation.isPending}
                   data-testid="textarea-answer"
                 />
                 <Button
                   size="icon"
                   className="absolute bottom-3 right-3 rounded-xl shadow-lg"
-                  disabled={!answer.trim() || mutation.isPending}
+                  disabled={!answer.trim() || mutation.isPending || completeMutation.isPending}
                   onClick={() => mutation.mutate(answer)}
                   data-testid="button-send"
                 >
@@ -225,7 +241,6 @@ export default function Interview() {
           </div>
         </div>
 
-        {/* Sidebar Status (Desktop) */}
         <aside className="hidden lg:flex w-80 border-l bg-card/30 flex-col p-6 space-y-6">
           <div className="space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Session Stats</h3>
@@ -233,9 +248,10 @@ export default function Interview() {
               <Card className="bg-primary/5 border-none shadow-none p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold">Average Rating</span>
-                  <Badge variant="outline" className="bg-background">{lastCandidateMessage?.feedback?.rating || "—"}/10</Badge>
+                  <Badge variant="outline" className="bg-background">{stats.count > 0 ? `${stats.avgRating}/10` : "—"}</Badge>
                 </div>
-                <Progress value={(lastCandidateMessage?.feedback?.rating || 0) * 10} className="h-1.5" />
+                <Progress value={Number(stats.avgRating) * 10} className="h-1.5" />
+                <p className="text-[10px] text-muted-foreground mt-2 text-center uppercase tracking-tighter">Based on {stats.count} responses</p>
               </Card>
             </div>
           </div>
