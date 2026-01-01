@@ -21,7 +21,6 @@ export async function registerRoutes(
       const input = api.interviews.create.input.parse(req.body);
       const interview = await storage.createInterview(input);
       
-      // Generate the first question immediately
       const completion = await openai.chat.completions.create({
         model: "gpt-5.1",
         messages: [
@@ -78,14 +77,12 @@ export async function registerRoutes(
 
       const history = await storage.getMessages(interviewId);
       
-      // 1. Save User Answer
       const userMessage = await storage.createMessage({
         interviewId,
         role: "candidate",
         content,
       });
 
-      // 2. AI Analysis
       const completion = await openai.chat.completions.create({
         model: "gpt-5.1",
         messages: [
@@ -111,7 +108,10 @@ export async function registerRoutes(
             If strong, ask about trade-offs, scalability, or edge cases.
             Cover topics: Architecture, Database, Security, Testing, Performance.`
           },
-          ...history.map(m => ({ role: m.role === "candidate" ? "user" : "assistant", content: m.content })),
+          ...history.map(m => ({ 
+            role: (m.role === "candidate" ? "user" : "assistant") as "user" | "assistant", 
+            content: m.content 
+          })),
           { role: "user", content }
         ],
         response_format: { type: "json_object" },
@@ -119,20 +119,6 @@ export async function registerRoutes(
 
       const result = JSON.parse(completion.choices[0].message.content || "{}");
       
-      // 3. Update User Message with Feedback
-      // We need to update the message we just created. 
-      // Storage doesn't have updateMessage, but I can cheat or add it.
-      // Actually, I can just not update it in DB for now and return it, OR add updateMessage to storage.
-      // Let's assume we want to store it. I'll add updateMessage to storage interface in a moment or just use raw SQL if needed.
-      // Better: I'll store the feedback in the NEXT message? No, feedback belongs to the answer.
-      // I'll update the user message.
-      // For now, I'll just return it in the response as requested by the API contract.
-      // Wait, schema has feedback column on messages.
-      
-      // Hack: Delete and re-create? No. 
-      // I will add updateMessage to storage.
-      
-      // 4. Create Next Question (Interviewer Message)
       const nextQuestion = await storage.createMessage({
         interviewId,
         role: "interviewer",
@@ -140,7 +126,7 @@ export async function registerRoutes(
       });
 
       res.json({
-        message: { ...userMessage, feedback: result.feedback }, // Return with feedback
+        message: { ...userMessage, feedback: result.feedback },
         response: nextQuestion,
         feedback: result.feedback,
       });
@@ -169,7 +155,10 @@ export async function registerRoutes(
             "project_improvements": ["list"]
           }`
         },
-        ...history.map(m => ({ role: m.role === "candidate" ? "user" : "assistant", content: m.content })),
+        ...history.map(m => ({ 
+          role: (m.role === "candidate" ? "user" : "assistant") as "user" | "assistant", 
+          content: m.content 
+        })),
         { role: "user", content: "End interview and generate summary." }
       ],
       response_format: { type: "json_object" },
