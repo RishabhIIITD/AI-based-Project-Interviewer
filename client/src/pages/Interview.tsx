@@ -20,9 +20,56 @@ export default function Interview() {
   const processMessage = useProcessMessage();
   const completeInterview = useCompleteInterview();
   
-  const [input, setInput] = useState("");
-  const scrollRef = useRef<HTMLDivElement>(null);
-  
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window)) {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+
+      recognitionRef.current.onresult = (event: any) => {
+        let finalTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          setInput((prev) => prev + (prev ? " " : "") + finalTranscript);
+        }
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsRecording(false);
+      };
+    }
+  }, []);
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+    } else {
+      try {
+        recognitionRef.current?.start();
+        setIsRecording(true);
+      } catch (err) {
+        console.error("Speech recognition error", err);
+      }
+    }
+  };
+
+  const speak = (text: string) => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
   // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
@@ -133,6 +180,7 @@ export default function Interview() {
                 key={message.id} 
                 message={message} 
                 isLatest={i === messages.length - 1}
+                onSpeak={speak}
               />
             ))}
             
@@ -171,9 +219,9 @@ export default function Interview() {
                   type="button" 
                   size="icon"
                   variant="ghost"
-                  className="text-muted-foreground hover:text-primary"
-                  disabled
-                  title="Voice input coming soon"
+                  className={`${isRecording ? "text-destructive animate-pulse" : "text-muted-foreground"} hover:text-primary transition-colors`}
+                  onClick={toggleRecording}
+                  title={isRecording ? "Stop recording" : "Record answer"}
                 >
                   <Mic className="w-5 h-5" />
                 </Button>
