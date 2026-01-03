@@ -20,7 +20,9 @@ export default function Interview() {
   const processMessage = useProcessMessage();
   const completeInterview = useCompleteInterview();
   
+  const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
