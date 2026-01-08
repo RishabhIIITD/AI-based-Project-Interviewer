@@ -9,6 +9,7 @@ import OpenAI from "openai";
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import MemoryStore from "memorystore";
+import { recordInterviewStats, ensureHeaderRow, type InterviewStatsRow } from "./googleSheets";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -354,8 +355,40 @@ export async function registerRoutes(
       summary.overall_score
     );
 
+    // Record stats to Google Sheets (async, don't block response)
+    try {
+      const user = await storage.getUserById(interview.userId!);
+      const startTime = interview.createdAt ? new Date(interview.createdAt) : new Date();
+      const endTime = updatedInterview.completedAt ? new Date(updatedInterview.completedAt) : new Date();
+      const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
+
+      const statsRow: InterviewStatsRow = {
+        interviewId: interview.id,
+        studentName: user?.fullName || 'Unknown',
+        studentEmail: user?.email || 'Unknown',
+        projectTitle: interview.title,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        durationMinutes,
+        overallScore: summary.overall_score || 0,
+        responseCount,
+        strengths: (summary.strengths || []).join('; '),
+        weaknesses: (summary.weaknesses || []).join('; '),
+        revisionTopics: (summary.revision_topics || []).join('; ')
+      };
+
+      recordInterviewStats(statsRow).catch(err => {
+        console.error('[GoogleSheets] Background recording failed:', err);
+      });
+    } catch (sheetsError) {
+      console.error('[GoogleSheets] Failed to prepare stats:', sheetsError);
+    }
+
     res.json(updatedInterview);
   });
+
+  // Ensure Google Sheets header row on startup
+  ensureHeaderRow().catch(err => console.error('[GoogleSheets] Header setup failed:', err));
 
   return httpServer;
 }
