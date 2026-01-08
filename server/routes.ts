@@ -343,9 +343,9 @@ export async function registerRoutes(
 
     const summary = JSON.parse(completion.choices[0].message.content || "{}");
     
-    // Add question count to summary
-    const questionCount = history.filter(m => m.role === "interviewer").length;
-    summary.question_count = questionCount;
+    // Add response count to summary (candidate's answers)
+    const responseCount = history.filter(m => m.role === "candidate").length;
+    summary.response_count = responseCount;
     
     const updatedInterview = await storage.updateInterviewStatus(
       interviewId, 

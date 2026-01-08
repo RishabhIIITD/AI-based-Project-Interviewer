@@ -160,9 +160,9 @@ export default function Summary() {
                 <MessageSquare className="w-5 h-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Questions</p>
-                <p className="font-semibold" data-testid="text-question-count">
-                  {summary.question_count || "N/A"}
+                <p className="text-sm text-muted-foreground">Responses</p>
+                <p className="font-semibold" data-testid="text-response-count">
+                  {summary.response_count || "N/A"}
                 </p>
               </div>
             </div>

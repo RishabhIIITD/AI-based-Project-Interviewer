@@ -80,5 +80,5 @@ export type SummaryData = {
   weaknesses: string[];
   revision_topics: string[];
   project_improvements: string[];
-  question_count?: number;
+  response_count?: number;
 };
