@@ -1,25 +1,158 @@
 
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
+import { insertUserSchema, loginSchema } from "@shared/schema";
 import { z } from "zod";
 import OpenAI from "openai";
+import bcrypt from "bcryptjs";
+import session from "express-session";
+import MemoryStore from "memorystore";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+declare module "express-session" {
+  interface SessionData {
+    userId: number;
+  }
+}
+
+const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
+  if (req.session.userId) {
+    next();
+  } else {
+    res.status(401).json({ message: "Unauthorized" });
+  }
+};
+
+const isAdmin = async (req: Request, res: Response, next: NextFunction) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  const user = await storage.getUserById(req.session.userId);
+  if (user?.role !== "admin") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  next();
+};
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
 
-  app.post(api.interviews.create.path, async (req, res) => {
+  // Session middleware
+  const MemStore = MemoryStore(session);
+  app.use(session({
+    secret: process.env.SESSION_SECRET || "dev-secret-key",
+    resave: false,
+    saveUninitialized: false,
+    store: new MemStore({ checkPeriod: 86400000 }),
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  }));
+
+  // Auth routes
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const input = insertUserSchema.parse(req.body);
+      
+      const existing = await storage.getUserByEmail(input.email);
+      if (existing) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      const hashedPassword = await bcrypt.hash(input.password, 10);
+      const user = await storage.createUser({
+        ...input,
+        password: hashedPassword,
+      });
+
+      req.session.userId = user.id;
+      res.status(201).json({ id: user.id, email: user.email, fullName: user.fullName, role: user.role });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const input = loginSchema.parse(req.body);
+      
+      const user = await storage.getUserByEmail(input.email);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const valid = await bcrypt.compare(input.password, user.password);
+      if (!valid) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      req.session.userId = user.id;
+      res.json({ id: user.id, email: user.email, fullName: user.fullName, role: user.role });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) return res.status(500).json({ message: "Logout failed" });
+      res.json({ message: "Logged out" });
+    });
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUserById(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
+    res.json({ id: user.id, email: user.email, fullName: user.fullName, role: user.role });
+  });
+
+  // Admin routes
+  app.get("/api/admin/students", isAdmin, async (req, res) => {
+    const users = await storage.getAllUsers();
+    const students = users.filter(u => u.role === "student");
+    res.json(students.map(s => ({ id: s.id, email: s.email, fullName: s.fullName, createdAt: s.createdAt })));
+  });
+
+  app.get("/api/admin/interviews", isAdmin, async (req, res) => {
+    const allInterviews = await storage.getAllInterviews();
+    const users = await storage.getAllUsers();
+    const userMap = new Map(users.map(u => [u.id, u]));
+    
+    const enriched = allInterviews.map(interview => ({
+      ...interview,
+      studentName: userMap.get(interview.userId)?.fullName || "Unknown",
+      studentEmail: userMap.get(interview.userId)?.email || "Unknown",
+    }));
+    
+    res.json(enriched);
+  });
+
+  // Interview routes (protected)
+  app.post(api.interviews.create.path, isAuthenticated, async (req, res) => {
     try {
       const input = api.interviews.create.input.parse(req.body);
-      const interview = await storage.createInterview(input);
+      const interview = await storage.createInterview(input, req.session.userId!);
       
       const completion = await openai.chat.completions.create({
         model: "gpt-5.1",
@@ -54,26 +187,49 @@ export async function registerRoutes(
     }
   });
 
-  app.get(api.interviews.get.path, async (req, res) => {
+  app.get(api.interviews.get.path, isAuthenticated, async (req, res) => {
     const interview = await storage.getInterview(Number(req.params.id));
     if (!interview) {
       return res.status(404).json({ message: 'Interview not found' });
     }
+    // Allow access if user owns interview or is admin
+    const user = await storage.getUserById(req.session.userId!);
+    if (interview.userId !== req.session.userId && user?.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
     res.json(interview);
   });
 
-  app.get(api.interviews.getMessages.path, async (req, res) => {
-    const messages = await storage.getMessages(Number(req.params.id));
+  app.get("/api/interviews/my", isAuthenticated, async (req, res) => {
+    const interviews = await storage.getInterviewsByUser(req.session.userId!);
+    res.json(interviews);
+  });
+
+  app.get(api.interviews.getMessages.path, isAuthenticated, async (req, res) => {
+    const interviewId = Number(req.params.id);
+    const interview = await storage.getInterview(interviewId);
+    if (!interview) {
+      return res.status(404).json({ message: "Interview not found" });
+    }
+    // Check ownership or admin access
+    const user = await storage.getUserById(req.session.userId!);
+    if (interview.userId !== req.session.userId && user?.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const messages = await storage.getMessages(interviewId);
     res.json(messages);
   });
 
-  app.post(api.interviews.processMessage.path, async (req, res) => {
+  app.post(api.interviews.processMessage.path, isAuthenticated, async (req, res) => {
     try {
       const interviewId = Number(req.params.id);
       const { content } = api.interviews.processMessage.input.parse(req.body);
       
       const interview = await storage.getInterview(interviewId);
       if (!interview) return res.status(404).json({ message: "Interview not found" });
+      if (interview.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
 
       const history = await storage.getMessages(interviewId);
       
@@ -137,8 +293,16 @@ export async function registerRoutes(
     }
   });
 
-  app.post(api.interviews.complete.path, async (req, res) => {
+  app.post(api.interviews.complete.path, isAuthenticated, async (req, res) => {
     const interviewId = Number(req.params.id);
+    const interview = await storage.getInterview(interviewId);
+    if (!interview) {
+      return res.status(404).json({ message: "Interview not found" });
+    }
+    if (interview.userId !== req.session.userId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     const history = await storage.getMessages(interviewId);
     
     const completion = await openai.chat.completions.create({
@@ -166,14 +330,14 @@ export async function registerRoutes(
 
     const summary = JSON.parse(completion.choices[0].message.content || "{}");
     
-    const interview = await storage.updateInterviewStatus(
+    const updatedInterview = await storage.updateInterviewStatus(
       interviewId, 
       "completed", 
       summary, 
       summary.overall_score
     );
 
-    res.json(interview);
+    res.json(updatedInterview);
   });
 
   return httpServer;
