@@ -28,6 +28,7 @@ export default function Dashboard() {
 
   const { data: interviews = [], isLoading } = useQuery<Interview[]>({
     queryKey: [isAdmin ? "/api/admin/interviews" : "/api/interviews/my"],
+    refetchOnMount: "always",
   });
 
   const handleLogout = async () => {

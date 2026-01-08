@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, LogOut, Loader2, PlayCircle, StopCircle, Mic } from "lucide-react";
+import { Send, LogOut, Loader2, PlayCircle, StopCircle, Mic, ArrowLeft } from "lucide-react";
 import { useInterview, useInterviewMessages, useProcessMessage, useCompleteInterview } from "@/hooks/use-interviews";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -149,6 +149,14 @@ export default function Interview() {
       {/* Header */}
       <header className="h-16 border-b bg-card/50 backdrop-blur px-6 flex items-center justify-between shrink-0 z-10">
         <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setLocation("/dashboard")}
+            data-testid="button-back-dashboard"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
           <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
             <div className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
           </div>

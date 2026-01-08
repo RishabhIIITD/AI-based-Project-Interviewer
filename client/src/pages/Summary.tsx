@@ -1,7 +1,7 @@
 import { useLocation, useParams } from "wouter";
 import { motion } from "framer-motion";
 import { useInterview } from "@/hooks/use-interviews";
-import { Loader2, ArrowRight, CheckCircle2, AlertTriangle, BookOpen, RefreshCw } from "lucide-react";
+import { Loader2, ArrowRight, CheckCircle2, AlertTriangle, BookOpen, RefreshCw, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -172,12 +172,23 @@ export default function Summary() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
-          className="flex justify-center pb-12"
+          className="flex flex-wrap justify-center gap-4 pb-12"
         >
+          <Button 
+            size="lg" 
+            variant="outline"
+            className="h-14 px-8 text-lg"
+            onClick={() => setLocation("/dashboard")}
+            data-testid="button-back-dashboard"
+          >
+            <Home className="mr-2 w-5 h-5" />
+            Back to Dashboard
+          </Button>
           <Button 
             size="lg" 
             className="h-14 px-8 text-lg shadow-xl shadow-primary/20"
             onClick={() => setLocation("/")}
+            data-testid="button-new-interview"
           >
             Start New Simulation
             <ArrowRight className="ml-2 w-5 h-5" />
