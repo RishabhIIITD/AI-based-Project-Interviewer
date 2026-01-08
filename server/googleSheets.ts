@@ -48,7 +48,12 @@ async function getUncachableGoogleSheetClient() {
   return google.sheets({ version: 'v4', auth: oauth2Client });
 }
 
-const SPREADSHEET_ID = '1vFJOmT8Ec-oUAYknmLC0-9wGMF0m36iSPAptcU567wU';
+let spreadsheetId: string | null = null;
+let spreadsheetUrl: string | null = null;
+
+export function getSpreadsheetUrl(): string | null {
+  return spreadsheetUrl;
+}
 
 export type InterviewStatsRow = {
   interviewId: number;
@@ -65,8 +70,61 @@ export type InterviewStatsRow = {
   revisionTopics: string;
 };
 
+async function createSpreadsheet(): Promise<string> {
+  const sheets = await getUncachableGoogleSheetClient();
+  
+  const response = await sheets.spreadsheets.create({
+    requestBody: {
+      properties: {
+        title: 'Interview Statistics'
+      },
+      sheets: [{
+        properties: {
+          title: 'Interviews'
+        }
+      }]
+    }
+  });
+
+  const newSpreadsheetId = response.data.spreadsheetId!;
+  spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${newSpreadsheetId}/edit`;
+  
+  console.log(`[GoogleSheets] Created new spreadsheet: ${spreadsheetUrl}`);
+  
+  // Add header row
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: newSpreadsheetId,
+    range: 'Interviews!A1:L1',
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [[
+        'Interview ID',
+        'Student Name',
+        'Student Email',
+        'Project Title',
+        'Start Time',
+        'End Time',
+        'Duration (mins)',
+        'Overall Score',
+        'Response Count',
+        'Strengths',
+        'Weaknesses',
+        'Revision Topics'
+      ]]
+    }
+  });
+
+  console.log('[GoogleSheets] Header row created');
+  return newSpreadsheetId;
+}
+
 export async function recordInterviewStats(stats: InterviewStatsRow): Promise<void> {
   try {
+    if (!spreadsheetId) {
+      console.log('[GoogleSheets] Spreadsheet not initialized, skipping recording');
+      return;
+    }
+
     const sheets = await getUncachableGoogleSheetClient();
     
     const values = [[
@@ -85,8 +143,8 @@ export async function recordInterviewStats(stats: InterviewStatsRow): Promise<vo
     ]];
 
     await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: 'Sheet1!A:L',
+      spreadsheetId: spreadsheetId,
+      range: 'Interviews!A:L',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values
@@ -99,59 +157,12 @@ export async function recordInterviewStats(stats: InterviewStatsRow): Promise<vo
   }
 }
 
-export async function ensureHeaderRow(): Promise<void> {
+export async function initializeSpreadsheet(): Promise<void> {
   try {
-    const sheets = await getUncachableGoogleSheetClient();
-    
-    // First, get spreadsheet info to find the first sheet name
-    const spreadsheetInfo = await sheets.spreadsheets.get({
-      spreadsheetId: SPREADSHEET_ID
-    });
-    
-    const firstSheetTitle = spreadsheetInfo.data.sheets?.[0]?.properties?.title || 'Sheet1';
-    console.log(`[GoogleSheets] Using sheet: ${firstSheetTitle}`);
-    
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${firstSheetTitle}!A1:L1`
-    });
-
-    if (!response.data.values || response.data.values.length === 0) {
-      const headers = [[
-        'Interview ID',
-        'Student Name',
-        'Student Email',
-        'Project Title',
-        'Start Time',
-        'End Time',
-        'Duration (mins)',
-        'Overall Score',
-        'Response Count',
-        'Strengths',
-        'Weaknesses',
-        'Revision Topics'
-      ]];
-
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${firstSheetTitle}!A1:L1`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: headers
-        }
-      });
-
-      console.log('[GoogleSheets] Header row created');
-    }
+    spreadsheetId = await createSpreadsheet();
+    console.log(`[GoogleSheets] Initialized with spreadsheet ID: ${spreadsheetId}`);
+    console.log(`[GoogleSheets] View your interview stats at: ${spreadsheetUrl}`);
   } catch (error: any) {
-    if (error.status === 404) {
-      console.error('[GoogleSheets] Spreadsheet not found or not accessible. Make sure the spreadsheet is shared with the connected Google account.');
-      console.error('[GoogleSheets] Spreadsheet ID:', SPREADSHEET_ID);
-    } else if (error.status === 403) {
-      console.error('[GoogleSheets] Permission denied. The connected Google account needs Editor access to this spreadsheet.');
-    } else {
-      console.error('[GoogleSheets] Failed to ensure header row:', error.message || error);
-      console.error('[GoogleSheets] Error details:', JSON.stringify(error.response?.data || error.errors || {}, null, 2));
-    }
+    console.error('[GoogleSheets] Failed to initialize spreadsheet:', error.message || error);
   }
 }

@@ -9,7 +9,7 @@ import OpenAI from "openai";
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import MemoryStore from "memorystore";
-import { recordInterviewStats, ensureHeaderRow, type InterviewStatsRow } from "./googleSheets";
+import { recordInterviewStats, initializeSpreadsheet, getSpreadsheetUrl, type InterviewStatsRow } from "./googleSheets";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -387,8 +387,18 @@ export async function registerRoutes(
     res.json(updatedInterview);
   });
 
-  // Ensure Google Sheets header row on startup
-  ensureHeaderRow().catch(err => console.error('[GoogleSheets] Header setup failed:', err));
+  // Initialize Google Sheets spreadsheet on startup
+  initializeSpreadsheet().catch(err => console.error('[GoogleSheets] Initialization failed:', err));
+
+  // Endpoint to get the spreadsheet URL
+  app.get("/api/admin/spreadsheet-url", isAdmin, (req, res) => {
+    const url = getSpreadsheetUrl();
+    if (url) {
+      res.json({ url });
+    } else {
+      res.status(404).json({ message: "Spreadsheet not initialized yet" });
+    }
+  });
 
   return httpServer;
 }
