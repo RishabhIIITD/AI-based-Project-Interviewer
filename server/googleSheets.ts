@@ -48,7 +48,7 @@ async function getUncachableGoogleSheetClient() {
   return google.sheets({ version: 'v4', auth: oauth2Client });
 }
 
-const SPREADSHEET_ID = '1fnI45pV9nvgnd8su5XN2VI2GwUUO73ko-FUPd_rL0Vc';
+const SPREADSHEET_ID = '1vFJOmT8Ec-oUAYknmLC0-9wGMF0m36iSPAptcU567wU';
 
 export type InterviewStatsRow = {
   interviewId: number;
@@ -146,8 +146,12 @@ export async function ensureHeaderRow(): Promise<void> {
   } catch (error: any) {
     if (error.status === 404) {
       console.error('[GoogleSheets] Spreadsheet not found or not accessible. Make sure the spreadsheet is shared with the connected Google account.');
+      console.error('[GoogleSheets] Spreadsheet ID:', SPREADSHEET_ID);
+    } else if (error.status === 403) {
+      console.error('[GoogleSheets] Permission denied. The connected Google account needs Editor access to this spreadsheet.');
     } else {
       console.error('[GoogleSheets] Failed to ensure header row:', error.message || error);
+      console.error('[GoogleSheets] Error details:', JSON.stringify(error.response?.data || error.errors || {}, null, 2));
     }
   }
 }
