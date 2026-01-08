@@ -1,7 +1,7 @@
 
 import { db } from "./db";
 import { 
-  interviews, messages, users,
+  interviews, messages, users, appSettings,
   type Interview, type InsertInterview, 
   type Message, type InsertMessage,
   type User, type InsertUser,
@@ -26,6 +26,10 @@ export interface IStorage {
   // Messages
   createMessage(message: InsertMessage & { feedback?: FeedbackData }): Promise<Message>;
   getMessages(interviewId: number): Promise<Message[]>;
+
+  // App Settings
+  getSetting(key: string): Promise<string | undefined>;
+  setSetting(key: string, value: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -98,6 +102,21 @@ export class DatabaseStorage implements IStorage {
       .from(messages)
       .where(eq(messages.interviewId, interviewId))
       .orderBy(asc(messages.createdAt));
+  }
+
+  // App Settings
+  async getSetting(key: string): Promise<string | undefined> {
+    const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, key));
+    return setting?.value;
+  }
+
+  async setSetting(key: string, value: string): Promise<void> {
+    await db.insert(appSettings)
+      .values({ key, value })
+      .onConflictDoUpdate({
+        target: appSettings.key,
+        set: { value }
+      });
   }
 }
 
