@@ -141,8 +141,8 @@ export async function registerRoutes(
     
     const enriched = allInterviews.map(interview => ({
       ...interview,
-      studentName: userMap.get(interview.userId)?.fullName || "Unknown",
-      studentEmail: userMap.get(interview.userId)?.email || "Unknown",
+      studentName: interview.userId ? userMap.get(interview.userId)?.fullName || "Unknown" : "Unknown",
+      studentEmail: interview.userId ? userMap.get(interview.userId)?.email || "Unknown" : "Unknown",
     }));
     
     res.json(enriched);
@@ -188,7 +188,11 @@ export async function registerRoutes(
   });
 
   app.get(api.interviews.get.path, isAuthenticated, async (req, res) => {
-    const interview = await storage.getInterview(Number(req.params.id));
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: 'Invalid interview ID' });
+    }
+    const interview = await storage.getInterview(id);
     if (!interview) {
       return res.status(404).json({ message: 'Interview not found' });
     }
@@ -207,6 +211,9 @@ export async function registerRoutes(
 
   app.get(api.interviews.getMessages.path, isAuthenticated, async (req, res) => {
     const interviewId = Number(req.params.id);
+    if (isNaN(interviewId)) {
+      return res.status(400).json({ message: 'Invalid interview ID' });
+    }
     const interview = await storage.getInterview(interviewId);
     if (!interview) {
       return res.status(404).json({ message: "Interview not found" });
@@ -223,6 +230,9 @@ export async function registerRoutes(
   app.post(api.interviews.processMessage.path, isAuthenticated, async (req, res) => {
     try {
       const interviewId = Number(req.params.id);
+      if (isNaN(interviewId)) {
+        return res.status(400).json({ message: 'Invalid interview ID' });
+      }
       const { content } = api.interviews.processMessage.input.parse(req.body);
       
       const interview = await storage.getInterview(interviewId);
@@ -295,6 +305,9 @@ export async function registerRoutes(
 
   app.post(api.interviews.complete.path, isAuthenticated, async (req, res) => {
     const interviewId = Number(req.params.id);
+    if (isNaN(interviewId)) {
+      return res.status(400).json({ message: 'Invalid interview ID' });
+    }
     const interview = await storage.getInterview(interviewId);
     if (!interview) {
       return res.status(404).json({ message: "Interview not found" });
