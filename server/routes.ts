@@ -343,6 +343,10 @@ export async function registerRoutes(
 
     const summary = JSON.parse(completion.choices[0].message.content || "{}");
     
+    // Add question count to summary
+    const questionCount = history.filter(m => m.role === "interviewer").length;
+    summary.question_count = questionCount;
+    
     const updatedInterview = await storage.updateInterviewStatus(
       interviewId, 
       "completed", 

@@ -1,11 +1,12 @@
 import { useLocation, useParams } from "wouter";
 import { motion } from "framer-motion";
 import { useInterview } from "@/hooks/use-interviews";
-import { Loader2, ArrowRight, CheckCircle2, AlertTriangle, BookOpen, RefreshCw, Home } from "lucide-react";
+import { Loader2, ArrowRight, CheckCircle2, AlertTriangle, BookOpen, RefreshCw, Home, Clock, Calendar, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import type { SummaryData } from "@shared/schema";
+import { format } from "date-fns";
 
 // Helper for staggered animations
 const container = {
@@ -55,6 +56,13 @@ export default function Summary() {
   const scoreColor = score >= 80 ? "text-green-400" : score >= 60 ? "text-yellow-400" : "text-red-400";
   const scoreGradient = score >= 80 ? "from-green-400 to-emerald-600" : score >= 60 ? "from-yellow-400 to-orange-500" : "from-red-500 to-pink-600";
 
+  // Calculate duration
+  const startTime = interview.createdAt ? new Date(interview.createdAt) : null;
+  const endTime = interview.completedAt ? new Date(interview.completedAt) : null;
+  const durationMs = startTime && endTime ? endTime.getTime() - startTime.getTime() : 0;
+  const durationMinutes = Math.floor(durationMs / 60000);
+  const durationSeconds = Math.floor((durationMs % 60000) / 1000);
+
   return (
     <div className="min-h-screen bg-background text-foreground py-12 px-4 md:px-8">
       <div className="max-w-5xl mx-auto space-y-12">
@@ -96,6 +104,67 @@ export default function Summary() {
               <p className="text-xl md:text-2xl text-foreground font-display">
                 {score >= 80 ? "Outstanding Performance 🚀" : score >= 60 ? "Solid Effort, Room to Grow 🌱" : "Needs Improvement 🔧"}
               </p>
+            </div>
+          </Card>
+        </motion.div>
+
+        {/* Interview Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="grid grid-cols-1 md:grid-cols-4 gap-4"
+        >
+          <Card className="p-4 bg-secondary/30 border-white/5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Duration</p>
+                <p className="font-semibold" data-testid="text-duration">
+                  {durationMinutes}m {durationSeconds}s
+                </p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4 bg-secondary/30 border-white/5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Started</p>
+                <p className="font-semibold text-sm" data-testid="text-start-time">
+                  {startTime ? format(startTime, "MMM d, yyyy h:mm a") : "N/A"}
+                </p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4 bg-secondary/30 border-white/5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Completed</p>
+                <p className="font-semibold text-sm" data-testid="text-end-time">
+                  {endTime ? format(endTime, "MMM d, yyyy h:mm a") : "N/A"}
+                </p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4 bg-secondary/30 border-white/5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <MessageSquare className="w-5 h-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Questions</p>
+                <p className="font-semibold" data-testid="text-question-count">
+                  {summary.question_count || "N/A"}
+                </p>
+              </div>
             </div>
           </Card>
         </motion.div>

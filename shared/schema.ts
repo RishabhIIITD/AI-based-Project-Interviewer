@@ -22,6 +22,7 @@ export const interviews = pgTable("interviews", {
   overallScore: integer("overall_score"),
   summary: jsonb("summary"), // { strengths: [], weaknesses: [], revision_topics: [], project_improvements: [] }
   createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
 });
 
 export const messages = pgTable("messages", {
@@ -79,4 +80,5 @@ export type SummaryData = {
   weaknesses: string[];
   revision_topics: string[];
   project_improvements: string[];
+  question_count?: number;
 };

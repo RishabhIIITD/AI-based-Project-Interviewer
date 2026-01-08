@@ -76,7 +76,8 @@ export class DatabaseStorage implements IStorage {
       .set({ 
         status, 
         summary: summary as any, 
-        overallScore: score 
+        overallScore: score,
+        completedAt: status === "completed" ? new Date() : undefined
       })
       .where(eq(interviews.id, id))
       .returning();

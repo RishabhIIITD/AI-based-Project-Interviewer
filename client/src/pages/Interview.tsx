@@ -101,6 +101,7 @@ export default function Interview() {
 
   // Handle completing the interview
   const handleComplete = async () => {
+    if (completeInterview.isPending) return;
     if (!confirm("Are you sure you want to end the interview?")) return;
     
     try {
@@ -122,10 +123,13 @@ export default function Interview() {
     }
   };
 
-  if (loadingInterview || loadingMessages) {
+  if (loadingInterview || loadingMessages || completeInterview.isPending) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
         <Loader2 className="w-10 h-10 animate-spin text-primary" />
+        {completeInterview.isPending && (
+          <p className="text-muted-foreground animate-pulse">Generating performance summary...</p>
+        )}
       </div>
     );
   }
@@ -171,6 +175,8 @@ export default function Interview() {
           size="sm" 
           className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
           onClick={handleComplete}
+          disabled={completeInterview.isPending}
+          data-testid="button-end-session"
         >
           <LogOut className="w-4 h-4 mr-2" />
           End Session
