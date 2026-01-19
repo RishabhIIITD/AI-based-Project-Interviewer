@@ -15,6 +15,7 @@ export const users = pgTable("users", {
 export const interviews = pgTable("interviews", {
   id: serial("id").primaryKey(),
   userId: integer("user_id"),
+  subjectId: integer("subject_id"), // optional link to subject for topic-based practice
   title: text("title").notNull(),
   description: text("description").notNull(),
   link: text("link"),
@@ -40,9 +41,44 @@ export const appSettings = pgTable("app_settings", {
   value: text("value").notNull(),
 });
 
+export const subjects = pgTable("subjects", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  icon: text("icon"), // lucide icon name
+  isPreset: boolean("is_preset").default(false), // preset vs user-created
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userSubjects = pgTable("user_subjects", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  subjectId: integer("subject_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const studyMaterials = pgTable("study_materials", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  subjectId: integer("subject_id").notNull(),
+  fileName: text("file_name").notNull(),
+  fileType: text("file_type").notNull(), // pdf, txt, md
+  content: text("content"), // extracted text content for AI
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   role: true,
+  createdAt: true
+});
+
+export const insertSubjectSchema = createInsertSchema(subjects).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertStudyMaterialSchema = createInsertSchema(studyMaterials).omit({
+  id: true,
   createdAt: true
 });
 
@@ -88,3 +124,9 @@ export type SummaryData = {
   project_improvements: string[];
   response_count?: number;
 };
+
+export type Subject = typeof subjects.$inferSelect;
+export type InsertSubject = z.infer<typeof insertSubjectSchema>;
+export type UserSubject = typeof userSubjects.$inferSelect;
+export type StudyMaterial = typeof studyMaterials.$inferSelect;
+export type InsertStudyMaterial = z.infer<typeof insertStudyMaterialSchema>;

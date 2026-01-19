@@ -3,13 +3,42 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { insertUserSchema, loginSchema } from "@shared/schema";
+import { insertUserSchema, loginSchema, insertSubjectSchema } from "@shared/schema";
 import { z } from "zod";
 import OpenAI from "openai";
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import MemoryStore from "memorystore";
+import multer from "multer";
 import { recordInterviewStats, initializeSpreadsheet, getSpreadsheetUrl, type InterviewStatsRow } from "./googleSheets";
+
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (req, file, cb) => {
+    const allowed = ['text/plain', 'text/markdown', 'application/pdf'];
+    if (allowed.includes(file.mimetype) || file.originalname.endsWith('.md') || file.originalname.endsWith('.txt')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only .txt, .md, and .pdf files are allowed'));
+    }
+  }
+});
+
+const PRESET_SUBJECTS = [
+  { name: "Data Structures", icon: "Binary" },
+  { name: "Algorithms", icon: "GitBranch" },
+  { name: "Database Systems", icon: "Database" },
+  { name: "Operating Systems", icon: "Cpu" },
+  { name: "Computer Networks", icon: "Network" },
+  { name: "Machine Learning", icon: "Brain" },
+  { name: "Web Development", icon: "Globe" },
+  { name: "System Design", icon: "Boxes" },
+  { name: "Object-Oriented Programming", icon: "Code" },
+  { name: "Software Engineering", icon: "Wrench" },
+  { name: "Computer Architecture", icon: "HardDrive" },
+  { name: "Cybersecurity", icon: "Shield" },
+];
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -385,6 +414,132 @@ export async function registerRoutes(
     }
 
     res.json(updatedInterview);
+  });
+
+  // ===== SUBJECTS & STUDY MATERIALS =====
+  
+  // Seed preset subjects on startup
+  async function seedPresetSubjects() {
+    const existing = await storage.getPresetSubjects();
+    if (existing.length === 0) {
+      console.log('[Subjects] Seeding preset subjects...');
+      for (const subject of PRESET_SUBJECTS) {
+        await storage.createSubject({ name: subject.name, icon: subject.icon, isPreset: true });
+      }
+      console.log('[Subjects] Preset subjects seeded.');
+    }
+  }
+  seedPresetSubjects().catch(err => console.error('[Subjects] Seeding failed:', err));
+
+  // Get all subjects (preset)
+  app.get("/api/subjects", async (req, res) => {
+    const subjects = await storage.getPresetSubjects();
+    res.json(subjects);
+  });
+
+  // Get user's selected subjects
+  app.get("/api/subjects/my", isAuthenticated, async (req, res) => {
+    const subjects = await storage.getUserSubjects(req.session.userId!);
+    res.json(subjects);
+  });
+
+  // Add subject to user's list
+  app.post("/api/subjects/my", isAuthenticated, async (req, res) => {
+    try {
+      const { subjectId } = req.body;
+      if (!subjectId) return res.status(400).json({ message: "subjectId required" });
+      await storage.addUserSubject(req.session.userId!, subjectId);
+      res.status(201).json({ message: "Subject added" });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to add subject" });
+    }
+  });
+
+  // Remove subject from user's list
+  app.delete("/api/subjects/my/:subjectId", isAuthenticated, async (req, res) => {
+    const subjectId = Number(req.params.subjectId);
+    if (isNaN(subjectId)) return res.status(400).json({ message: "Invalid subject ID" });
+    await storage.removeUserSubject(req.session.userId!, subjectId);
+    res.json({ message: "Subject removed" });
+  });
+
+  // Create custom subject
+  app.post("/api/subjects", isAuthenticated, async (req, res) => {
+    try {
+      const input = insertSubjectSchema.parse({ ...req.body, isPreset: false });
+      const subject = await storage.createSubject(input);
+      await storage.addUserSubject(req.session.userId!, subject.id);
+      res.status(201).json(subject);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Failed to create subject" });
+    }
+  });
+
+  // Upload study material
+  app.post("/api/subjects/:subjectId/materials", isAuthenticated, upload.single('file'), async (req, res) => {
+    try {
+      const subjectId = Number(req.params.subjectId);
+      if (isNaN(subjectId)) return res.status(400).json({ message: "Invalid subject ID" });
+      
+      const file = req.file;
+      if (!file) return res.status(400).json({ message: "No file uploaded" });
+
+      // Extract text content from file
+      let content = '';
+      if (file.mimetype === 'text/plain' || file.originalname.endsWith('.txt') || file.originalname.endsWith('.md')) {
+        content = file.buffer.toString('utf-8');
+      } else if (file.mimetype === 'application/pdf') {
+        // For PDFs, we'll store the raw content and note it needs parsing
+        // In a production app, you'd use a PDF parser library
+        content = '[PDF content - text extraction would be done here]';
+      }
+
+      const material = await storage.createStudyMaterial({
+        userId: req.session.userId!,
+        subjectId,
+        fileName: file.originalname,
+        fileType: file.mimetype,
+        content: content.slice(0, 50000) // Limit content size
+      });
+
+      res.status(201).json(material);
+    } catch (err) {
+      console.error('Upload error:', err);
+      res.status(500).json({ message: "Failed to upload material" });
+    }
+  });
+
+  // Get study materials for a subject
+  app.get("/api/subjects/:subjectId/materials", isAuthenticated, async (req, res) => {
+    const subjectId = Number(req.params.subjectId);
+    if (isNaN(subjectId)) return res.status(400).json({ message: "Invalid subject ID" });
+    const materials = await storage.getStudyMaterialsBySubject(req.session.userId!, subjectId);
+    res.json(materials);
+  });
+
+  // Get all user's study materials
+  app.get("/api/materials", isAuthenticated, async (req, res) => {
+    const materials = await storage.getStudyMaterialsByUser(req.session.userId!);
+    res.json(materials);
+  });
+
+  // Delete study material
+  app.delete("/api/materials/:id", isAuthenticated, async (req, res) => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid material ID" });
+    await storage.deleteStudyMaterial(id);
+    res.json({ message: "Material deleted" });
+  });
+
+  // Get interviews by subject (for progress tracking)
+  app.get("/api/subjects/:subjectId/interviews", isAuthenticated, async (req, res) => {
+    const subjectId = Number(req.params.subjectId);
+    if (isNaN(subjectId)) return res.status(400).json({ message: "Invalid subject ID" });
+    const interviews = await storage.getInterviewsBySubject(req.session.userId!, subjectId);
+    res.json(interviews);
   });
 
   // Initialize Google Sheets spreadsheet on startup
