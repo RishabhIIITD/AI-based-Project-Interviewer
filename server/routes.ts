@@ -184,23 +184,49 @@ export async function registerRoutes(
       const input = api.interviews.create.input.parse(req.body);
       const interview = await storage.createInterview(input, req.session.userId!);
       
+      // Fetch study materials if this is a subject-based interview
+      let studyMaterialsContext = '';
+      if (input.subjectId) {
+        const materials = await storage.getStudyMaterialsBySubject(req.session.userId!, input.subjectId);
+        if (materials.length > 0) {
+          const materialsContent = materials
+            .filter(m => m.content)
+            .map(m => `--- ${m.fileName} ---\n${m.content?.slice(0, 10000)}`) // Limit each file
+            .join('\n\n');
+          if (materialsContent) {
+            studyMaterialsContext = `\n\nSTUDY MATERIALS FROM STUDENT:\n${materialsContent.slice(0, 30000)}`;
+          }
+        }
+      }
+
+      // Determine if this is a subject-based or project-based interview
+      const isSubjectBased = input.description.startsWith('Subject:');
+      
+      const systemPrompt = isSubjectBased 
+        ? `You are an expert technical instructor conducting a practice Q&A session.
+          Topic: ${input.title}
+          Context: ${input.description}
+          ${studyMaterialsContext}
+          
+          Your goal is to help the student learn and practice this topic through questions.
+          Ask questions that test understanding of key concepts from the study materials if available.
+          If no study materials, ask fundamental questions about the topic.
+          Start with a foundational concept question.
+          Keep questions clear and educational.`
+        : `You are an expert technical interviewer conducting a project-based interview.
+          Project Title: ${input.title}
+          Description: ${input.description}
+          
+          Your goal is to assess the candidate's technical depth, problem-solving skills, and communication.
+          Start by asking a high-level question about the project overview or motivation.
+          Keep the question concise and professional.`;
+      
       const completion = await openai.chat.completions.create({
         model: "gpt-5.1",
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert technical interviewer conducting a project-based interview.
-            Project Title: ${input.title}
-            Description: ${input.description}
-            
-            Your goal is to assess the candidate's technical depth, problem-solving skills, and communication.
-            Start by asking a high-level question about the project overview or motivation.
-            Keep the question concise and professional.`
-          }
-        ],
+        messages: [{ role: "system", content: systemPrompt }],
       });
 
-      const firstQuestion = completion.choices[0].message.content || "Could you tell me about your project?";
+      const firstQuestion = completion.choices[0].message.content || "Let's begin. Can you explain the main concepts?";
       
       await storage.createMessage({
         interviewId: interview.id,

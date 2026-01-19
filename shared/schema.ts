@@ -93,7 +93,8 @@ export const insertInterviewSchema = createInsertSchema(interviews).omit({
   status: true, 
   overallScore: true, 
   summary: true, 
-  createdAt: true 
+  createdAt: true,
+  completedAt: true
 });
 
 export const insertMessageSchema = createInsertSchema(messages).omit({ 
