@@ -1,7 +1,5 @@
 
-import { db } from "./db";
 import { 
-  interviews, messages, users, appSettings, subjects, userSubjects, studyMaterials,
   type Interview, type InsertInterview, 
   type Message, type InsertMessage,
   type User, type InsertUser,
@@ -10,7 +8,6 @@ import {
   type StudyMaterial, type InsertStudyMaterial,
   type UserSubject
 } from "@shared/schema";
-import { eq, asc, desc, and } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -52,155 +49,249 @@ export interface IStorage {
   getInterviewsBySubject(userId: number, subjectId: number): Promise<Interview[]>;
 }
 
-export class DatabaseStorage implements IStorage {
+export class MemStorage implements IStorage {
+  private users: User[];
+  private interviews: Interview[];
+  private messages: Message[];
+  private subjects: Subject[];
+  private userSubjects: UserSubject[];
+  private studyMaterials: StudyMaterial[];
+  private settings: Map<string, string>;
+
+  private currentUserId: number;
+  private currentInterviewId: number;
+  private currentMessageId: number;
+  private currentSubjectId: number;
+  private currentUserSubjectId: number;
+  private currentStudyMaterialId: number;
+
+  constructor() {
+    this.users = [];
+    this.interviews = [];
+    this.messages = [];
+    this.subjects = [];
+    this.userSubjects = [];
+    this.studyMaterials = [];
+    this.settings = new Map();
+
+    this.currentUserId = 1;
+    this.currentInterviewId = 1;
+    this.currentMessageId = 1;
+    this.currentSubjectId = 1;
+    this.currentUserSubjectId = 1;
+    this.currentStudyMaterialId = 1;
+
+    // Seed default user
+    this.createUser({
+      email: "demo@example.com",
+      password: "password", // Not hashed in this simplified version or hashed if we keep bcrypt
+      fullName: "Demo User"
+    });
+
+    // Seed preset subjects
+    const PRESET_SUBJECTS = [
+      { name: "Data Structures", icon: "Binary" },
+      { name: "Algorithms", icon: "GitBranch" },
+      { name: "Database Systems", icon: "Database" },
+      { name: "Operating Systems", icon: "Cpu" },
+      { name: "Computer Networks", icon: "Network" },
+      { name: "Machine Learning", icon: "Brain" },
+      { name: "Web Development", icon: "Globe" },
+      { name: "System Design", icon: "Boxes" },
+      { name: "Object-Oriented Programming", icon: "Code" },
+      { name: "Software Engineering", icon: "Wrench" },
+      { name: "Computer Architecture", icon: "HardDrive" },
+      { name: "Cybersecurity", icon: "Shield" },
+    ];
+
+    PRESET_SUBJECTS.forEach(s => {
+      this.createSubject({ ...s, isPreset: true });
+    });
+  }
+
   // Users
   async createUser(user: InsertUser & { password: string }): Promise<User> {
-    const [newUser] = await db.insert(users).values(user).returning();
+    const id = this.currentUserId++;
+    const newUser: User = { 
+      ...user, 
+      id, 
+      role: "student",
+      createdAt: new Date()
+    };
+    this.users.push(newUser);
     return newUser;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
-    return user;
+    return this.users.find(u => u.email === email);
   }
 
   async getUserById(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    return this.users.find(u => u.id === id);
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users).orderBy(desc(users.createdAt));
+    return [...this.users].sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
   }
 
   // Interviews
   async createInterview(interview: InsertInterview, userId: number): Promise<Interview> {
-    const [newInterview] = await db.insert(interviews).values({ ...interview, userId }).returning();
+    const id = this.currentInterviewId++;
+    const newInterview: Interview = {
+      ...interview,
+      id,
+      userId,
+      status: "in_progress",
+      overallScore: null,
+      summary: null,
+      createdAt: new Date(),
+      completedAt: null,
+      link: interview.link || null,
+      subjectId: interview.subjectId || null,
+    };
+    this.interviews.push(newInterview);
     return newInterview;
   }
 
   async getInterview(id: number): Promise<Interview | undefined> {
-    const [interview] = await db.select().from(interviews).where(eq(interviews.id, id));
-    return interview;
+    return this.interviews.find(i => i.id === id);
   }
 
   async getInterviewsByUser(userId: number): Promise<Interview[]> {
-    return await db.select()
-      .from(interviews)
-      .where(eq(interviews.userId, userId))
-      .orderBy(desc(interviews.createdAt));
+    return this.interviews
+      .filter(i => i.userId === userId)
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
   }
 
   async getAllInterviews(): Promise<Interview[]> {
-    return await db.select().from(interviews).orderBy(desc(interviews.createdAt));
+    return [...this.interviews].sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
   }
 
   async updateInterviewStatus(id: number, status: string, summary?: SummaryData, score?: number): Promise<Interview> {
-    const [updated] = await db.update(interviews)
-      .set({ 
-        status, 
-        summary: summary as any, 
-        overallScore: score,
-        completedAt: status === "completed" ? new Date() : undefined
-      })
-      .where(eq(interviews.id, id))
-      .returning();
-    return updated;
+    const interview = this.interviews.find(i => i.id === id);
+    if (!interview) throw new Error("Interview not found");
+
+    interview.status = status;
+    if (summary) interview.summary = summary;
+    if (score !== undefined) interview.overallScore = score;
+    if (status === "completed") interview.completedAt = new Date();
+
+    return interview;
   }
 
   // Messages
   async createMessage(message: InsertMessage & { feedback?: FeedbackData }): Promise<Message> {
-    const [newMessage] = await db.insert(messages).values({
+    const id = this.currentMessageId++;
+    const newMessage: Message = {
       ...message,
-      feedback: message.feedback as any
-    }).returning();
+      id,
+      feedback: message.feedback || null,
+      createdAt: new Date()
+    };
+    this.messages.push(newMessage);
     return newMessage;
   }
 
   async getMessages(interviewId: number): Promise<Message[]> {
-    return await db.select()
-      .from(messages)
-      .where(eq(messages.interviewId, interviewId))
-      .orderBy(asc(messages.createdAt));
+    return this.messages
+      .filter(m => m.interviewId === interviewId)
+      .sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));
   }
 
   // App Settings
   async getSetting(key: string): Promise<string | undefined> {
-    const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, key));
-    return setting?.value;
+    return this.settings.get(key);
   }
 
   async setSetting(key: string, value: string): Promise<void> {
-    await db.insert(appSettings)
-      .values({ key, value })
-      .onConflictDoUpdate({
-        target: appSettings.key,
-        set: { value }
-      });
+    this.settings.set(key, value);
   }
 
   // Subjects
   async getAllSubjects(): Promise<Subject[]> {
-    return await db.select().from(subjects).orderBy(asc(subjects.name));
+    return [...this.subjects].sort((a, b) => a.name.localeCompare(b.name));
   }
 
   async getPresetSubjects(): Promise<Subject[]> {
-    return await db.select().from(subjects).where(eq(subjects.isPreset, true)).orderBy(asc(subjects.name));
+    return this.subjects
+      .filter(s => s.isPreset)
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   async createSubject(subject: InsertSubject): Promise<Subject> {
-    const [newSubject] = await db.insert(subjects).values(subject).returning();
+    const id = this.currentSubjectId++;
+    const newSubject: Subject = {
+      ...subject,
+      id,
+      icon: subject.icon || null,
+      isPreset: subject.isPreset || false,
+      createdAt: new Date()
+    };
+    this.subjects.push(newSubject);
     return newSubject;
   }
 
   async getUserSubjects(userId: number): Promise<Subject[]> {
-    const results = await db
-      .select({ subject: subjects })
-      .from(userSubjects)
-      .innerJoin(subjects, eq(userSubjects.subjectId, subjects.id))
-      .where(eq(userSubjects.userId, userId));
-    return results.map(r => r.subject);
+    const userSubjectIds = this.userSubjects
+      .filter(us => us.userId === userId)
+      .map(us => us.subjectId);
+    
+    return this.subjects.filter(s => userSubjectIds.includes(s.id));
   }
 
   async addUserSubject(userId: number, subjectId: number): Promise<UserSubject> {
-    const [result] = await db.insert(userSubjects).values({ userId, subjectId }).returning();
-    return result;
+    const id = this.currentUserSubjectId++;
+    const newUserSubject: UserSubject = {
+      id,
+      userId,
+      subjectId,
+      createdAt: new Date()
+    };
+    this.userSubjects.push(newUserSubject);
+    return newUserSubject;
   }
 
   async removeUserSubject(userId: number, subjectId: number): Promise<void> {
-    await db.delete(userSubjects).where(
-      and(eq(userSubjects.userId, userId), eq(userSubjects.subjectId, subjectId))
+    this.userSubjects = this.userSubjects.filter(
+      us => !(us.userId === userId && us.subjectId === subjectId)
     );
   }
 
   // Study Materials
   async createStudyMaterial(material: InsertStudyMaterial): Promise<StudyMaterial> {
-    const [newMaterial] = await db.insert(studyMaterials).values(material).returning();
+    const id = this.currentStudyMaterialId++;
+    const newMaterial: StudyMaterial = {
+      ...material,
+      id,
+      content: material.content || null,
+      createdAt: new Date()
+    };
+    this.studyMaterials.push(newMaterial);
     return newMaterial;
   }
 
   async getStudyMaterialsBySubject(userId: number, subjectId: number): Promise<StudyMaterial[]> {
-    return await db.select().from(studyMaterials)
-      .where(and(eq(studyMaterials.userId, userId), eq(studyMaterials.subjectId, subjectId)))
-      .orderBy(desc(studyMaterials.createdAt));
+    return this.studyMaterials
+      .filter(sm => sm.userId === userId && sm.subjectId === subjectId)
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
   }
 
   async getStudyMaterialsByUser(userId: number): Promise<StudyMaterial[]> {
-    return await db.select().from(studyMaterials)
-      .where(eq(studyMaterials.userId, userId))
-      .orderBy(desc(studyMaterials.createdAt));
+    return this.studyMaterials
+      .filter(sm => sm.userId === userId)
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
   }
 
   async deleteStudyMaterial(id: number): Promise<void> {
-    await db.delete(studyMaterials).where(eq(studyMaterials.id, id));
+    this.studyMaterials = this.studyMaterials.filter(sm => sm.id !== id);
   }
 
   // Analytics
   async getInterviewsBySubject(userId: number, subjectId: number): Promise<Interview[]> {
-    return await db.select().from(interviews)
-      .where(and(eq(interviews.userId, userId), eq(interviews.subjectId, subjectId)))
-      .orderBy(desc(interviews.createdAt));
+    return this.interviews
+      .filter(i => i.userId === userId && i.subjectId === subjectId)
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new MemStorage();

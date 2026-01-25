@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type NoteInput } from "@shared/routes";
-import { type InsertInterview } from "@shared/schema";
+import { type InsertInterview, type CreateInterviewRequest } from "@shared/schema";
 
 // GET /api/interviews/:id
 export function useInterview(id: number) {
@@ -34,7 +34,7 @@ export function useInterviewMessages(id: number) {
 // POST /api/interviews
 export function useCreateInterview() {
   return useMutation({
-    mutationFn: async (data: InsertInterview) => {
+    mutationFn: async (data: CreateInterviewRequest) => {
       const res = await fetch(api.interviews.create.path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -59,12 +59,12 @@ export function useProcessMessage() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, content }: { id: number; content: string }) => {
+    mutationFn: async ({ id, content, apiKey }: { id: number; content: string; apiKey?: string }) => {
       const url = buildUrl(api.interviews.processMessage.path, { id });
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, apiKey }),
         credentials: "include",
       });
 
@@ -86,10 +86,12 @@ export function useCompleteInterview() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async ({ id, apiKey }: { id: number; apiKey?: string }) => {
       const url = buildUrl(api.interviews.complete.path, { id });
       const res = await fetch(url, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey }),
         credentials: "include",
       });
       

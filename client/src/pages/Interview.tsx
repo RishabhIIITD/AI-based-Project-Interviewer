@@ -3,6 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, LogOut, Loader2, PlayCircle, StopCircle, Mic, ArrowLeft } from "lucide-react";
 import { useInterview, useInterviewMessages, useProcessMessage, useCompleteInterview } from "@/hooks/use-interviews";
+import { useLLM } from "@/context/llm-context";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,6 +20,7 @@ export default function Interview() {
   const { data: messages, isLoading: loadingMessages } = useInterviewMessages(interviewId);
   const processMessage = useProcessMessage();
   const completeInterview = useCompleteInterview();
+  const { apiKey } = useLLM();
   
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -88,7 +90,7 @@ export default function Interview() {
     setInput(""); // Optimistic clear
 
     try {
-      await processMessage.mutateAsync({ id: interviewId, content });
+      await processMessage.mutateAsync({ id: interviewId, content, apiKey });
     } catch (error) {
       setInput(content); // Restore on error
       toast({
@@ -105,7 +107,7 @@ export default function Interview() {
     if (!confirm("Are you sure you want to end the interview?")) return;
     
     try {
-      await completeInterview.mutateAsync(interviewId);
+      await completeInterview.mutateAsync({ id: interviewId, apiKey });
       setLocation(`/summary/${interviewId}`);
     } catch (error) {
       toast({

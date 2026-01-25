@@ -245,16 +245,6 @@ export default function Summary() {
         >
           <Button 
             size="lg" 
-            variant="outline"
-            className="h-14 px-8 text-lg"
-            onClick={() => setLocation("/dashboard")}
-            data-testid="button-back-dashboard"
-          >
-            <Home className="mr-2 w-5 h-5" />
-            Back to Dashboard
-          </Button>
-          <Button 
-            size="lg" 
             className="h-14 px-8 text-lg shadow-xl shadow-primary/20"
             onClick={() => setLocation("/")}
             data-testid="button-new-interview"

@@ -1,6 +1,6 @@
 
 import { z } from 'zod';
-import { insertInterviewSchema, insertMessageSchema, interviews, messages } from './schema';
+import { insertInterviewSchema, insertMessageSchema, interviewSchema, messageSchema, createInterviewRequestSchema, processMessageRequestSchema, completeInterviewRequestSchema, type Interview, type Message } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -22,7 +22,7 @@ export const api = {
       path: '/api/interviews',
       input: insertInterviewSchema,
       responses: {
-        201: z.custom<typeof interviews.$inferSelect>(),
+        201: interviewSchema,
         400: errorSchemas.validation,
       },
     },
@@ -30,7 +30,7 @@ export const api = {
       method: 'GET' as const,
       path: '/api/interviews/:id',
       responses: {
-        200: z.custom<typeof interviews.$inferSelect>(),
+        200: interviewSchema,
         404: errorSchemas.notFound,
       },
     },
@@ -42,8 +42,8 @@ export const api = {
       }),
       responses: {
         200: z.object({
-          message: z.custom<typeof messages.$inferSelect>(),
-          response: z.custom<typeof messages.$inferSelect>(),
+          message: messageSchema,
+          response: messageSchema,
           feedback: z.custom<any>(),
         }),
         404: errorSchemas.notFound,
@@ -53,14 +53,15 @@ export const api = {
       method: 'GET' as const,
       path: '/api/interviews/:id/messages',
       responses: {
-        200: z.array(z.custom<typeof messages.$inferSelect>()),
+        200: z.array(messageSchema),
       },
     },
     complete: {
       method: 'POST' as const,
       path: '/api/interviews/:id/complete',
+      input: completeInterviewRequestSchema,
       responses: {
-        200: z.custom<typeof interviews.$inferSelect>(),
+        200: interviewSchema,
       },
     },
   },

@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { useAuth, useLogout } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Plus, LogOut, Trophy, Clock, CheckCircle2, 
+  Plus, Trophy, Clock, CheckCircle2, 
   GraduationCap, Users, BarChart3, Loader2, TrendingUp, AlertCircle,
   Binary, GitBranch, Database, Cpu, Network, Brain, Globe, Boxes, 
   Code, Wrench, HardDrive, Shield
@@ -34,21 +34,11 @@ type Interview = {
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, isAdmin } = useAuth();
-  const logout = useLogout();
 
   const { data: interviews = [], isLoading } = useQuery<Interview[]>({
     queryKey: [isAdmin ? "/api/admin/interviews" : "/api/interviews/my"],
     refetchOnMount: "always",
   });
-
-  const { data: subjects = [] } = useQuery<Subject[]>({
-    queryKey: ['/api/subjects'],
-  });
-
-  const handleLogout = async () => {
-    await logout.mutateAsync();
-    setLocation("/login");
-  };
 
   const completedInterviews = interviews.filter(i => i.status === "completed");
   const avgScore = completedInterviews.length > 0
@@ -67,30 +57,6 @@ export default function Dashboard() {
       score: i.overallScore || 0,
       index: index + 1,
     }));
-
-  // Calculate subject-based analytics - use subjectId only for accuracy
-  const subjectStats = subjects.map(subject => {
-    const subjectInterviews = completedInterviews.filter(i => 
-      i.subjectId === subject.id
-    );
-    const avg = subjectInterviews.length > 0
-      ? Math.round(subjectInterviews.reduce((sum, i) => sum + (i.overallScore || 0), 0) / subjectInterviews.length)
-      : 0;
-    return {
-      id: subject.id,
-      name: subject.name,
-      icon: subject.icon,
-      count: subjectInterviews.length,
-      avgScore: avg,
-      interviews: subjectInterviews,
-    };
-  }).filter(s => s.count > 0);
-
-  // Identify weak subjects (below 60% avg)
-  const weakSubjects = subjectStats.filter(s => s.avgScore > 0 && s.avgScore < 60);
-
-  // Identify strong subjects (above 75% avg)
-  const strongSubjects = subjectStats.filter(s => s.avgScore >= 75);
 
   return (
     <div className="min-h-screen bg-background">
@@ -112,16 +78,13 @@ export default function Dashboard() {
                 New Practice
               </Button>
             )}
-            <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
-              <LogOut className="w-4 h-4" />
-            </Button>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8 space-y-8">
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4" data-testid="stats-grid">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4" data-testid="stats-grid">
           <Card data-testid="card-total-sessions">
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
@@ -161,72 +124,7 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
-          <Card data-testid="card-subjects-practiced">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-blue-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold" data-testid="text-subjects-practiced">{subjectStats.length}</p>
-                  <p className="text-sm text-muted-foreground" data-testid="label-subjects-practiced">Subjects Practiced</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
-
-        {/* Recommendations */}
-        {!isAdmin && (weakSubjects.length > 0 || strongSubjects.length > 0) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {weakSubjects.length > 0 && (
-              <Card className="border-amber-500/30 bg-amber-500/5" data-testid="card-weak-subjects">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2" data-testid="text-weak-subjects-title">
-                    <AlertCircle className="w-4 h-4 text-amber-500" />
-                    Needs More Practice
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {weakSubjects.map(s => {
-                      const IconComponent = iconMap[s.icon || 'Code'] || Code;
-                      return (
-                        <Badge key={s.id} variant="outline" className="gap-1" data-testid={`badge-weak-subject-${s.id}`}>
-                          <IconComponent className="w-3 h-3" />
-                          {s.name} ({s.avgScore}%)
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            {strongSubjects.length > 0 && (
-              <Card className="border-emerald-500/30 bg-emerald-500/5" data-testid="card-strong-subjects">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2" data-testid="text-strong-subjects-title">
-                    <Trophy className="w-4 h-4 text-emerald-500" />
-                    Strong Subjects
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {strongSubjects.map(s => {
-                      const IconComponent = iconMap[s.icon || 'Code'] || Code;
-                      return (
-                        <Badge key={s.id} variant="outline" className="gap-1 border-emerald-500/30" data-testid={`badge-strong-subject-${s.id}`}>
-                          <IconComponent className="w-3 h-3" />
-                          {s.name} ({s.avgScore}%)
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
 
         <Tabs defaultValue="history" className="w-full" data-testid="dashboard-tabs">
           <TabsList data-testid="tabs-list">
@@ -354,86 +252,7 @@ export default function Dashboard() {
             </TabsContent>
           )}
 
-          {/* By Subject Tab */}
-          {!isAdmin && (
-            <TabsContent value="subjects">
-              <Card data-testid="card-subject-performance">
-                <CardHeader>
-                  <CardTitle data-testid="text-subject-chart-title">Performance by Subject</CardTitle>
-                  <CardDescription data-testid="text-subjects-description">Average scores across different subjects</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {subjectStats.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground" data-testid="empty-state-subjects">
-                      <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>No subject-based practice sessions yet</p>
-                      <Button className="mt-4" onClick={() => setLocation("/")} data-testid="button-start-subject-practice">
-                        Start Subject Practice
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      <ResponsiveContainer width="100%" height={250} data-testid="chart-subject-bar">
-                        <BarChart data={subjectStats} layout="vertical">
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                          <XAxis type="number" domain={[0, 100]} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                          <YAxis 
-                            type="category" 
-                            dataKey="name" 
-                            width={150} 
-                            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} 
-                          />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: 'hsl(var(--card))', 
-                              border: '1px solid hsl(var(--border))',
-                              borderRadius: '8px'
-                            }}
-                            formatter={(value: number) => [`${value}%`, 'Average Score']}
-                          />
-                          <Bar dataKey="avgScore" radius={[0, 4, 4, 0]}>
-                            {subjectStats.map((entry, index) => (
-                              <Cell 
-                                key={`cell-${index}`} 
-                                fill={entry.avgScore >= 70 ? 'hsl(var(--chart-2))' : entry.avgScore >= 50 ? 'hsl(var(--chart-4))' : 'hsl(var(--destructive))'} 
-                              />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {subjectStats.map(s => {
-                          const IconComponent = iconMap[s.icon || 'Code'] || Code;
-                          return (
-                            <div 
-                              key={s.id} 
-                              className="p-4 rounded-lg border bg-card/50"
-                              data-testid={`card-subject-stat-${s.id}`}
-                            >
-                              <div className="flex items-center gap-2 mb-2">
-                                <IconComponent className="w-4 h-4 text-muted-foreground" />
-                                <span className="font-medium text-sm truncate" data-testid={`text-subject-name-${s.id}`}>{s.name}</span>
-                              </div>
-                              <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                                <span className={`text-2xl font-bold ${
-                                  s.avgScore >= 70 ? 'text-emerald-500' : 
-                                  s.avgScore >= 50 ? 'text-amber-500' : 'text-destructive'
-                                }`} data-testid={`text-subject-score-${s.id}`}>
-                                  {s.avgScore}%
-                                </span>
-                                <span className="text-xs text-muted-foreground" data-testid={`text-subject-count-${s.id}`}>{s.count} sessions</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
+          {/* By Subject Tab Removed */}
         </Tabs>
       </main>
     </div>
