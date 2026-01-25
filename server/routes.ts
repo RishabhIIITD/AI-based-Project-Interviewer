@@ -1,8 +1,8 @@
-import type { Express, Request, Response, NextFunction } from "express";
-import { createServer, type Server } from "http";
+import type { Express } from "express";
+import { type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { insertUserSchema, loginSchema, insertSubjectSchema } from "@shared/schema";
+import { insertSubjectSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import { recordInterviewStats, type InterviewStatsRow } from "./googleSheets";
@@ -12,7 +12,7 @@ import { getLLMProvider } from "./lib/llm/factory";
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     const allowed = ['text/plain', 'text/markdown', 'application/pdf'];
     if (allowed.includes(file.mimetype) || file.originalname.endsWith('.md') || file.originalname.endsWith('.txt')) {
       cb(null, true);
@@ -30,7 +30,7 @@ export async function registerRoutes(
 ): Promise<Server> {
 
   // Mock Auth routes - simplified for no-login version
-  app.get("/api/auth/me", async (req, res) => {
+  app.get("/api/auth/me", async (_req, res) => {
     const user = await storage.getUserById(DEFAULT_USER_ID);
     if (!user) {
       // Create default user if not exists (should be created in storage constructor)
@@ -40,13 +40,13 @@ export async function registerRoutes(
   });
 
   // Admin routes (simplified, everyone is effectively admin or student as needed)
-  app.get("/api/admin/students", async (req, res) => {
+  app.get("/api/admin/students", async (_req, res) => {
     const users = await storage.getAllUsers();
     const students = users.filter(u => u.role === "student");
     res.json(students.map(s => ({ id: s.id, email: s.email, fullName: s.fullName, createdAt: s.createdAt })));
   });
 
-  app.get("/api/admin/interviews", async (req, res) => {
+  app.get("/api/admin/interviews", async (_req, res) => {
     const allInterviews = await storage.getAllInterviews();
     const users = await storage.getAllUsers();
     const userMap = new Map(users.map(u => [u.id, u]));
@@ -143,7 +143,7 @@ export async function registerRoutes(
     res.json(interview);
   });
 
-  app.get("/api/interviews/my", async (req, res) => {
+  app.get("/api/interviews/my", async (_req, res) => {
     const interviews = await storage.getInterviewsByUser(DEFAULT_USER_ID);
     res.json(interviews);
   });
@@ -273,13 +273,13 @@ export async function registerRoutes(
   // ===== SUBJECTS & STUDY MATERIALS =====
   
   // Get all subjects (preset)
-  app.get("/api/subjects", async (req, res) => {
+  app.get("/api/subjects", async (_req, res) => {
     const subjects = await storage.getPresetSubjects();
     res.json(subjects);
   });
 
   // Get user's selected subjects
-  app.get("/api/subjects/my", async (req, res) => {
+  app.get("/api/subjects/my", async (_req, res) => {
     const subjects = await storage.getUserSubjects(DEFAULT_USER_ID);
     res.json(subjects);
   });

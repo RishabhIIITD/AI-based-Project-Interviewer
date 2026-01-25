@@ -1,13 +1,15 @@
 
 import { 
   type Interview, type InsertInterview, 
-  type Message, type InsertMessage,
+  type Message, type InsertMessage, 
   type User, type InsertUser,
   type FeedbackData, type SummaryData,
   type Subject, type InsertSubject,
   type StudyMaterial, type InsertStudyMaterial,
   type UserSubject
 } from "@shared/schema";
+
+const getTime = (d: Date | string | undefined | null) => d ? new Date(d).getTime() : 0;
 
 export interface IStorage {
   // Users
@@ -131,7 +133,7 @@ export class MemStorage implements IStorage {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return [...this.users].sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+    return [...this.users].sort((a, b) => getTime(b.createdAt) - getTime(a.createdAt));
   }
 
   // Interviews
@@ -160,11 +162,11 @@ export class MemStorage implements IStorage {
   async getInterviewsByUser(userId: number): Promise<Interview[]> {
     return this.interviews
       .filter(i => i.userId === userId)
-      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+      .sort((a, b) => getTime(b.createdAt) - getTime(a.createdAt));
   }
 
   async getAllInterviews(): Promise<Interview[]> {
-    return [...this.interviews].sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+    return [...this.interviews].sort((a, b) => getTime(b.createdAt) - getTime(a.createdAt));
   }
 
   async updateInterviewStatus(id: number, status: string, summary?: SummaryData, score?: number): Promise<Interview> {
@@ -195,7 +197,7 @@ export class MemStorage implements IStorage {
   async getMessages(interviewId: number): Promise<Message[]> {
     return this.messages
       .filter(m => m.interviewId === interviewId)
-      .sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));
+      .sort((a, b) => getTime(a.createdAt) - getTime(b.createdAt));
   }
 
   // App Settings
@@ -273,13 +275,13 @@ export class MemStorage implements IStorage {
   async getStudyMaterialsBySubject(userId: number, subjectId: number): Promise<StudyMaterial[]> {
     return this.studyMaterials
       .filter(sm => sm.userId === userId && sm.subjectId === subjectId)
-      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+      .sort((a, b) => getTime(b.createdAt) - getTime(a.createdAt));
   }
 
   async getStudyMaterialsByUser(userId: number): Promise<StudyMaterial[]> {
     return this.studyMaterials
       .filter(sm => sm.userId === userId)
-      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+      .sort((a, b) => getTime(b.createdAt) - getTime(a.createdAt));
   }
 
   async deleteStudyMaterial(id: number): Promise<void> {
@@ -290,7 +292,7 @@ export class MemStorage implements IStorage {
   async getInterviewsBySubject(userId: number, subjectId: number): Promise<Interview[]> {
     return this.interviews
       .filter(i => i.userId === userId && i.subjectId === subjectId)
-      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+      .sort((a, b) => getTime(b.createdAt) - getTime(a.createdAt));
   }
 }
 

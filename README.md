@@ -47,7 +47,7 @@ An AI-powered technical interview simulator designed to help students and profes
    npm run dev
    ```
 
-4. Open your browser at `http://localhost:5000`.
+4. Open your browser at `http://localhost:5001`.
 
 ## Usage
 

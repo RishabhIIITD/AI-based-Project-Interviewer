@@ -1,6 +1,6 @@
 
 import { z } from 'zod';
-import { insertInterviewSchema, insertMessageSchema, interviewSchema, messageSchema, createInterviewRequestSchema, processMessageRequestSchema, completeInterviewRequestSchema, type Interview, type Message } from './schema';
+import { interviewSchema, messageSchema, createInterviewRequestSchema, processMessageRequestSchema, completeInterviewRequestSchema } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -20,7 +20,7 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/interviews',
-      input: insertInterviewSchema,
+      input: createInterviewRequestSchema,
       responses: {
         201: interviewSchema,
         400: errorSchemas.validation,
@@ -37,9 +37,7 @@ export const api = {
     processMessage: {
       method: 'POST' as const,
       path: '/api/interviews/:id/messages',
-      input: z.object({
-        content: z.string(),
-      }),
+      input: processMessageRequestSchema,
       responses: {
         200: z.object({
           message: messageSchema,
