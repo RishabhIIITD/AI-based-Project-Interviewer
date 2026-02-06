@@ -102,16 +102,28 @@ Other Instructions:
   }
 
   async generateSummary(history: Message[]): Promise<SummaryJSON> {
-    const prompt = `Generate a final interview summary in JSON format ONLY based on this history:
-${history.map(m => `${m.role}: ${m.content}`).join('\n')}
+    const historyText = history.map(m => {
+      let entry = `${m.role}: ${m.content}`;
+      if (m.feedback && typeof m.feedback === 'object' && 'rating' in m.feedback) {
+         entry += `\n[Evaluator Feedback: Rating ${m.feedback.rating}/10. ${m.feedback.explanation}]`;
+      }
+      return entry;
+    }).join('\n\n');
+
+    const prompt = `Generate a final interview summary in JSON format ONLY based on this history.
+The history includes the candidate's answers and the evaluator's immediate feedback/rating for each answer.
+Use the ratings to calculate a precise Overall Score.
+
+History:
+${historyText}
 
 JSON Structure:
 {
   "overall_score": number (0-100),
-  "strengths": ["list"],
-  "weaknesses": ["list"],
-  "revision_topics": ["list"],
-  "project_improvements": ["list"]
+  "strengths": ["list of strong points"],
+  "weaknesses": ["list of weak points"],
+  "revision_topics": ["list of topics to study"],
+  "project_improvements": ["list of actionable improvements"]
 }`;
 
     const responseText = await this.callOllama(prompt, true);

@@ -39,7 +39,7 @@ function createWindow(port) {
       contextIsolation: true,
       nodeIntegration: false,
     },
-    title: "upGrad Project Interviewer",
+    title: "upGrad Interviewer",
   });
   win.setMenuBarVisibility(false);
   win.loadURL(`http://localhost:${port}`);

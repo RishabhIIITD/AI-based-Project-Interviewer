@@ -5,7 +5,7 @@ import { api } from "@shared/routes";
 import { insertSubjectSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
-import { recordInterviewStats, type InterviewStatsRow } from "./googleSheets";
+import { recordInterviewStats, type InterviewStatsRow, fetchQuestionsFromSheet } from "./googleSheets";
 import "dotenv/config";
 import { getLLMProvider } from "./lib/llm/factory";
 
@@ -70,44 +70,60 @@ export async function registerRoutes(
       
       const interview = await storage.createInterview(interviewData, DEFAULT_USER_ID);
       
-      // Fetch study materials if this is a subject-based interview
-      let studyMaterialsContext = '';
-      if (interviewData.subjectId) {
-        const materials = await storage.getStudyMaterialsBySubject(DEFAULT_USER_ID, interviewData.subjectId);
-        if (materials.length > 0) {
-          const materialsContent = materials
-            .filter(m => m.content)
-            .map(m => `--- ${m.fileName} ---\n${m.content?.slice(0, 10000)}`) // Limit each file
-            .join('\n\n');
-          if (materialsContent) {
-            studyMaterialsContext = `\n\nSTUDY MATERIALS FROM STUDENT:\n${materialsContent.slice(0, 30000)}`;
+      let firstQuestion = "";
+
+      if (interviewData.type === 'ai') {
+        try {
+          const questions = await fetchQuestionsFromSheet();
+          if (questions.length > 0) {
+            firstQuestion = questions[0].question;
+          } else {
+            firstQuestion = "I couldn't load questions from the sheet. Please tell me about yourself.";
+          }
+        } catch (error) {
+          console.error("Error fetching questions from sheet:", error);
+          firstQuestion = "I couldn't load questions from the sheet. Please tell me about yourself.";
+        }
+      } else {
+        // Fetch study materials if this is a subject-based interview
+        let studyMaterialsContext = '';
+        if (interviewData.subjectId) {
+          const materials = await storage.getStudyMaterialsBySubject(DEFAULT_USER_ID, interviewData.subjectId);
+          if (materials.length > 0) {
+            const materialsContent = materials
+              .filter(m => m.content)
+              .map(m => `--- ${m.fileName} ---\n${m.content?.slice(0, 10000)}`) // Limit each file
+              .join('\n\n');
+            if (materialsContent) {
+              studyMaterialsContext = `\n\nSTUDY MATERIALS FROM STUDENT:\n${materialsContent.slice(0, 30000)}`;
+            }
           }
         }
-      }
 
-      // Determine if this is a subject-based or project-based interview
-      const isSubjectBased = interviewData.description.startsWith('Subject:');
-      
-      const systemPrompt = isSubjectBased 
-        ? `You are an expert technical instructor conducting a practice Q&A session.
-          Topic: ${interviewData.title}
-          Context: ${interviewData.description}
-          ${studyMaterialsContext}
-          
-          Your goal is to help the student learn and practice this topic through questions.
-          Ask questions that test understanding of key concepts from the study materials if available.
-          If no study materials, ask fundamental questions about the topic.
-          Start with a foundational concept question.
-          Keep questions clear and educational.`
-        : `You are an expert technical interviewer conducting a project-based interview.
-          Project Title: ${interviewData.title}
-          Description: ${interviewData.description}
-          
-          Your goal is to assess the candidate's technical depth, problem-solving skills, and communication.
-          Start by asking a high-level question about the project overview or motivation.
-          Keep the question concise and professional.`;
-      
-      const firstQuestion = await provider.generateInterviewQuestions(systemPrompt);
+        // Determine if this is a subject-based or project-based interview
+        const isSubjectBased = interviewData.description.startsWith('Subject:');
+        
+        const systemPrompt = isSubjectBased 
+          ? `You are an expert technical instructor conducting a practice Q&A session.
+            Topic: ${interviewData.title}
+            Context: ${interviewData.description}
+            ${studyMaterialsContext}
+            
+            Your goal is to help the student learn and practice this topic through questions.
+            Ask questions that test understanding of key concepts from the study materials if available.
+            If no study materials, ask fundamental questions about the topic.
+            Start with a foundational concept question.
+            Keep questions clear and educational.`
+          : `You are an expert technical interviewer conducting a project-based interview.
+            Project Title: ${interviewData.title}
+            Description: ${interviewData.description}
+            
+            Your goal is to assess the candidate's technical depth, problem-solving skills, and communication.
+            Start by asking a high-level question about the project overview or motivation.
+            Keep the question concise and professional.`;
+        
+        firstQuestion = await provider.generateInterviewQuestions(systemPrompt);
+      }
       
       await storage.createMessage({
         interviewId: interview.id,
@@ -183,18 +199,48 @@ export async function registerRoutes(
       });
 
       const projectContext = `Project: ${interview.title} - ${interview.description}`;
-      const result = await provider.analyzeResponse(history, content, projectContext);
+      
+      let nextQuestionContent = "";
+      let feedback = null;
+
+      if (interview.type === 'ai') {
+        // Generate feedback for the user's answer
+        const result = await provider.analyzeResponse(history, content, projectContext);
+        feedback = result.feedback;
+
+        try {
+          const questions = await fetchQuestionsFromSheet();
+          const usedQuestions = new Set(history.filter(m => m.role === 'interviewer').map(m => m.content));
+          // Also add the first question which might be in history
+          const availableQuestions = questions.filter(q => !usedQuestions.has(q.question));
+          
+          if (availableQuestions.length > 0) {
+            nextQuestionContent = availableQuestions[0].question;
+          } else {
+            nextQuestionContent = "That's all the questions I have for now. Thank you!";
+          }
+        } catch (error) {
+          console.error("Error fetching questions from sheet:", error);
+          nextQuestionContent = "I encountered an error fetching the next question. Let's continue with: Tell me more about your project challenges.";
+        }
+      } else {
+        const result = await provider.analyzeResponse(history, content, projectContext);
+        
+        const next_question = result.next_question || "Let's move on. Can you explain the architecture?";
+        nextQuestionContent = next_question;
+        feedback = result.feedback;
+      }
       
       const nextQuestion = await storage.createMessage({
         interviewId,
         role: "interviewer",
-        content: result.next_question || "Let's move on. Can you explain the architecture?",
+        content: nextQuestionContent,
       });
 
       res.json({
-        message: { ...userMessage, feedback: result.feedback },
+        message: { ...userMessage, feedback },
         response: nextQuestion,
-        feedback: result.feedback,
+        feedback,
       });
 
     } catch (err: any) {
@@ -243,8 +289,8 @@ export async function registerRoutes(
 
         const statsRow: InterviewStatsRow = {
           interviewId: interview.id,
-          studentName: user?.fullName || 'Unknown',
-          studentEmail: user?.email || 'Unknown',
+          studentName: interview.studentName || user?.fullName || 'Unknown',
+          studentEmail: interview.studentEmail || user?.email || 'Unknown',
           projectTitle: interview.title,
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),

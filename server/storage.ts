@@ -150,6 +150,8 @@ export class MemStorage implements IStorage {
       completedAt: null,
       link: interview.link || null,
       subjectId: interview.subjectId || null,
+      studentName: interview.studentName || null,
+      studentEmail: interview.studentEmail || null,
     };
     this.interviews.push(newInterview);
     return newInterview;

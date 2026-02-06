@@ -1,6 +1,6 @@
 {
-  "name": "upgrad-project-interviewer",
-  "productName": "upGrad Project Interviewer",
+  "name": "upgrad-interviewer",
+  "productName": "upGrad Interviewer",
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",

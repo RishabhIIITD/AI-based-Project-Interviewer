@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="upGrad Project Interviewer"
+APP_NAME="upGrad Interviewer"
 DMG_NAME="Project-Interviewer.dmg"
 PORT="${PORT:-5001}"
 

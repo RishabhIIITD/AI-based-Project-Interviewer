@@ -2,8 +2,9 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
+import { useState } from "react";
 import { 
-  Terminal, Briefcase, ArrowRight, Loader2, Cloud, Server, Key
+  Terminal, Briefcase, ArrowRight, Loader2, Cloud, Server, Key, BrainCircuit
 } from "lucide-react";
 import { insertInterviewSchema, type InsertInterview } from "@shared/schema";
 import { useCreateInterview } from "@/hooks/use-interviews";
@@ -16,12 +17,14 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Home() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const createInterview = useCreateInterview();
   const { provider, setProvider, apiKey, setApiKey } = useLLM();
+  const [activeTab, setActiveTab] = useState<"project" | "ai">("ai");
   
   const form = useForm<InsertInterview>({
     resolver: zodResolver(insertInterviewSchema),
@@ -29,6 +32,9 @@ export default function Home() {
       title: "",
       description: "",
       link: "",
+      type: "project",
+      studentName: "",
+      studentEmail: "",
     },
   });
 
@@ -44,6 +50,9 @@ export default function Home() {
 
     createInterview.mutate({
       ...data,
+      title: activeTab === "ai" ? "AI Interview Session" : data.title,
+      description: activeTab === "ai" ? "AI Interview" : data.description,
+      type: activeTab,
       provider,
       apiKey: provider === "gemini" ? apiKey : undefined,
     }, {
@@ -87,11 +96,15 @@ export default function Home() {
             
             <h1 className="text-5xl md:text-7xl font-display font-bold leading-tight">
               Master Your <br />
-              <span className="text-gradient">Project Interview</span>
+              <span className="text-gradient">
+                {activeTab === 'project' ? 'Project Interview' : 'AI Interview'}
+              </span>
             </h1>
             
             <p className="text-lg md:text-xl text-muted-foreground leading-relaxed max-w-lg">
-              Practice interviews for your projects. Get AI-powered questions tailored to your project's tech stack and architecture.
+              {activeTab === 'project' 
+                ? "Practice interviews for your projects. Get AI-powered questions tailored to your project's tech stack and architecture."
+                : "Experience a structured interview session with curated questions. Get real-time feedback and comprehensive performance analysis."}
             </p>
           </motion.div>
 
@@ -105,70 +118,140 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
               
               <div className="relative z-10">
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "project" | "ai")} className="w-full mb-6">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="project" className="flex items-center gap-2">
+                      <Briefcase className="w-4 h-4" />
+                      Project Interview
+                    </TabsTrigger>
+                    <TabsTrigger value="ai" className="flex items-center gap-2">
+                      <BrainCircuit className="w-4 h-4" />
+                      AI Interview
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+
                 <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                  <Briefcase className="w-5 h-5 text-primary" />
-                  Project Interview
+                  {activeTab === "project" ? (
+                    <>
+                      <Briefcase className="w-5 h-5 text-primary" />
+                      Project Interview
+                    </>
+                  ) : (
+                    <>
+                      <BrainCircuit className="w-5 h-5 text-primary" />
+                      AI Interview
+                    </>
+                  )}
                 </h2>
                 
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onProjectSubmit)} className="space-y-6">
-                    <FormField
-                      control={form.control}
-                      name="title"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Project Title</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="e.g. E-commerce Microservices API" 
-                              className="bg-background/50" 
-                              data-testid="input-project-title"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {activeTab === "ai" ? (
+                      <>
+                        <FormField
+                          control={form.control}
+                          name="studentName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Student Name</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Enter your full name" 
+                                  className="bg-background/50" 
+                                  {...field} 
+                                  value={field.value || ''}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="studentEmail"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email ID</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Enter your email" 
+                                  className="bg-background/50" 
+                                  {...field} 
+                                  value={field.value || ''}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        {/* Hidden fields for AI mode */}
+                        <div className="hidden">
+                           <Input {...form.register("title")} value="AI Interview Session" />
+                           <Textarea {...form.register("description")} value="AI Interview" />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <FormField
+                          control={form.control}
+                          name="title"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Project Title</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="e.g. E-commerce Microservices API" 
+                                  className="bg-background/50" 
+                                  data-testid="input-project-title"
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                    <FormField
-                      control={form.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Project Description & Tech Stack</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="Describe your architecture, challenges, and technologies used (e.g. React, Node.js, AWS)..." 
-                              className="bg-background/50 min-h-[120px] resize-none"
-                              data-testid="input-project-description"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                        <FormField
+                          control={form.control}
+                          name="description"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Project Description & Tech Stack</FormLabel>
+                              <FormControl>
+                                <Textarea 
+                                  placeholder="Describe your architecture, challenges, and technologies used (e.g. React, Node.js, AWS)..." 
+                                  className="bg-background/50 min-h-[120px] resize-none"
+                                  data-testid="input-project-description"
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                    <FormField
-                      control={form.control}
-                      name="link"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Project Link (Optional)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="https://github.com/..." 
-                              className="bg-background/50"
-                              data-testid="input-project-link"
-                              {...field} 
-                              value={field.value || ''}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                        <FormField
+                          control={form.control}
+                          name="link"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Project Link (Optional)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="https://github.com/..." 
+                                  className="bg-background/50"
+                                  data-testid="input-project-link"
+                                  {...field} 
+                                  value={field.value || ''}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </>
+                    )}
 
                     {/* LLM Selection */}
                     <div className="space-y-4 pt-2">

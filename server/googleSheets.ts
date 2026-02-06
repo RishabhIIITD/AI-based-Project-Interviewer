@@ -78,6 +78,11 @@ export type InterviewStatsRow = {
   revisionTopics: string;
 };
 
+export async function recordInterviewStats(stats: InterviewStatsRow) {
+    // Placeholder for now as it depends on Replit env
+    console.log("Recording stats (mock):", stats);
+}
+
 async function createSpreadsheet(): Promise<{ id: string; url: string }> {
   const sheets = await getUncachableGoogleSheetClient();
   
@@ -98,144 +103,74 @@ async function createSpreadsheet(): Promise<{ id: string; url: string }> {
   const newSpreadsheetUrl = `https://docs.google.com/spreadsheets/d/${newSpreadsheetId}/edit`;
   
   console.log(`[GoogleSheets] Created new spreadsheet: ${newSpreadsheetUrl}`);
-  
-  // Add header row
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: newSpreadsheetId,
-    range: 'Interviews!A1:L1',
-    valueInputOption: 'USER_ENTERED',
-    requestBody: {
-      values: [[
-        'Interview ID',
-        'Student Name',
-        'Student Email',
-        'Project Title',
-        'Start Time',
-        'End Time',
-        'Duration (mins)',
-        'Overall Score',
-        'Response Count',
-        'Strengths',
-        'Weaknesses',
-        'Revision Topics'
-      ]]
-    }
-  });
-
-  console.log('[GoogleSheets] Header row created');
   return { id: newSpreadsheetId, url: newSpreadsheetUrl };
 }
 
-async function verifySpreadsheetAccess(sheetId: string): Promise<boolean> {
-  try {
-    const sheets = await getUncachableGoogleSheetClient();
-    await sheets.spreadsheets.get({ spreadsheetId: sheetId });
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
+export type QuestionRow = {
+  id: string;
+  question: string;
+  topic: string;
+  difficulty: string;
+};
 
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 2000;
-
-async function waitForInitialization(maxWaitMs: number = 10000): Promise<boolean> {
-  const startTime = Date.now();
-  while (!initialized && Date.now() - startTime < maxWaitMs) {
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-  return initialized;
-}
-
-export async function recordInterviewStats(stats: InterviewStatsRow): Promise<void> {
-  // Wait for initialization if not ready yet
-  if (!initialized) {
-    console.log('[GoogleSheets] Waiting for initialization...');
-    const ready = await waitForInitialization();
-    if (!ready || !spreadsheetId) {
-      console.error('[GoogleSheets] Spreadsheet not initialized after waiting, stats will not be recorded');
-      console.error('[GoogleSheets] Lost stats for interview:', stats.interviewId);
-      return;
-    }
-  }
-
-  let lastError: any;
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const sheets = await getUncachableGoogleSheetClient();
-      
-      const values = [[
-        stats.interviewId,
-        stats.studentName,
-        stats.studentEmail,
-        stats.projectTitle,
-        stats.startTime,
-        stats.endTime,
-        stats.durationMinutes,
-        stats.overallScore,
-        stats.responseCount,
-        stats.strengths,
-        stats.weaknesses,
-        stats.revisionTopics
-      ]];
-
-      await sheets.spreadsheets.values.append({
-        spreadsheetId: spreadsheetId!,
-        range: 'Interviews!A:L',
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values
-        }
-      });
-
-      console.log(`[GoogleSheets] Successfully recorded stats for interview ${stats.interviewId}`);
-      return;
-    } catch (error: any) {
-      lastError = error;
-      console.error(`[GoogleSheets] Attempt ${attempt}/${MAX_RETRIES} failed:`, error.message || error);
-      if (attempt < MAX_RETRIES) {
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
-      }
-    }
-  }
+export async function fetchQuestionsFromSheet(): Promise<QuestionRow[]> {
+  const SHEET_ID = '1KZJTr_Pd7B9CwP3-IvYFlgXo6VNqMdwMtXFJE5FgZcc';
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&t=${Date.now()}`;
   
-  console.error('[GoogleSheets] All retry attempts failed for interview:', stats.interviewId);
-  console.error('[GoogleSheets] Last error:', lastError?.message || lastError);
-}
-
-export async function initializeSpreadsheet(): Promise<void> {
   try {
-    // Check if we have an existing spreadsheet ID in the database
-    const existingId = await storage.getSetting(SPREADSHEET_ID_KEY);
-    const existingUrl = await storage.getSetting(SPREADSHEET_URL_KEY);
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch sheet: ${response.statusText}`);
+    }
+    const text = await response.text();
     
-    if (existingId && existingUrl) {
-      // Verify we still have access to this spreadsheet
-      const hasAccess = await verifySpreadsheetAccess(existingId);
-      if (hasAccess) {
-        spreadsheetId = existingId;
-        spreadsheetUrl = existingUrl;
-        initialized = true;
-        console.log(`[GoogleSheets] Using existing spreadsheet: ${spreadsheetUrl}`);
-        return;
+    // Simple CSV parser handling quotes
+    const rows: string[][] = [];
+    let currentRow: string[] = [];
+    let currentCell = '';
+    let insideQuotes = false;
+    
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const nextChar = text[i + 1];
+      
+      if (char === '"') {
+        if (insideQuotes && nextChar === '"') {
+          currentCell += '"';
+          i++; // Skip next quote
+        } else {
+          insideQuotes = !insideQuotes;
+        }
+      } else if (char === ',' && !insideQuotes) {
+        currentRow.push(currentCell.trim());
+        currentCell = '';
+      } else if ((char === '\r' || char === '\n') && !insideQuotes) {
+        if (char === '\r' && nextChar === '\n') i++;
+        currentRow.push(currentCell.trim());
+        if (currentRow.length > 0) rows.push(currentRow);
+        currentRow = [];
+        currentCell = '';
       } else {
-        console.log('[GoogleSheets] Lost access to existing spreadsheet, creating new one');
+        currentCell += char;
       }
     }
+    if (currentCell || currentRow.length > 0) {
+      currentRow.push(currentCell.trim());
+      if (currentRow.length > 0) rows.push(currentRow);
+    }
+
+    // Skip header and map
+    const dataRows = rows.slice(1);
     
-    // Create a new spreadsheet
-    const { id, url } = await createSpreadsheet();
-    spreadsheetId = id;
-    spreadsheetUrl = url;
+    return dataRows.map(row => ({
+      id: row[0] || '',
+      question: row[1] || '',
+      topic: row[2] || '',
+      difficulty: row[3] || ''
+    })).filter(q => q.question && q.question.trim().length > 0);
     
-    // Persist the IDs
-    await storage.setSetting(SPREADSHEET_ID_KEY, id);
-    await storage.setSetting(SPREADSHEET_URL_KEY, url);
-    
-    initialized = true;
-    console.log(`[GoogleSheets] Initialized with spreadsheet ID: ${spreadsheetId}`);
-    console.log(`[GoogleSheets] View your interview stats at: ${spreadsheetUrl}`);
-  } catch (error: any) {
-    console.error('[GoogleSheets] Failed to initialize spreadsheet:', error.message || error);
+  } catch (error) {
+    console.error('Error fetching questions:', error);
+    return [];
   }
 }
