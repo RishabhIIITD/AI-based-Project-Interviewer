@@ -186,7 +186,7 @@ export default function Summary() {
                 <h3 className="text-xl font-bold font-display">Key Strengths</h3>
               </div>
               <ul className="space-y-3">
-                {summary.strengths.map((point, i) => (
+                {(summary.strengths || []).map((point, i) => (
                   <li key={i} className="flex gap-3 text-muted-foreground">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 mt-2 shrink-0" />
                     <span>{point}</span>
@@ -206,7 +206,7 @@ export default function Summary() {
                 <h3 className="text-xl font-bold font-display">Areas for Improvement</h3>
               </div>
               <ul className="space-y-3">
-                {summary.weaknesses.map((point, i) => (
+                {(summary.weaknesses || []).map((point, i) => (
                   <li key={i} className="flex gap-3 text-muted-foreground">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-2 shrink-0" />
                     <span>{point}</span>
@@ -226,7 +226,7 @@ export default function Summary() {
                 <h3 className="text-xl font-bold font-display">Recommended Study Topics</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {summary.revision_topics.map((topic, i) => (
+                {(summary.revision_topics || []).map((topic, i) => (
                   <div key={i} className="bg-background p-4 rounded-lg border border-white/5 text-center hover:bg-white/5 transition-colors cursor-default">
                     <span className="font-mono text-sm text-primary-foreground">{topic}</span>
                   </div>

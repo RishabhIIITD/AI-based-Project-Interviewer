@@ -1,14 +1,18 @@
 {
-  "name": "rest-express",
+  "name": "upgrad-project-interviewer",
+  "productName": "upGrad Project Interviewer",
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
+  "main": "electron/main.mjs",
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "electron:dev": "npm run build && electron .",
+    "electron:dist": "npm run build && electron-builder --mac dmg"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -88,12 +92,26 @@
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.20",
     "drizzle-kit": "^0.31.8",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3",
     "esbuild": "^0.25.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.20.5",
     "typescript": "5.6.3",
     "vite": "^7.3.0"
+  },
+  "build": {
+    "appId": "com.projectinterviewer.app",
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.developer-tools"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json"
+    ]
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"

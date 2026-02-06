@@ -58,12 +58,20 @@ export class OllamaProvider implements LLMProvider {
     const prompt = `You are an expert technical interviewer.
 ${projectContext}
 
-History:
+History of the interview so far:
 ${history.map(m => `${m.role}: ${m.content}`).join('\n')}
-Candidate: ${currentAnswer}
 
-Analyze the candidate's last answer.
-Provide output in JSON format ONLY:
+Candidate's most recent answer: ${currentAnswer}
+
+TASK:
+1. Analyze the candidate's answer.
+2. Generate the NEXT question.
+
+CRITICAL INSTRUCTION - NO DUPLICATES:
+Review the "History" above. You MUST NOT ask any question that is similar or identical to questions already asked by the interviewer.
+If you are about to ask a question that is already in the history, choose a DIFFERENT topic or a follow-up question instead.
+
+Output in JSON format ONLY:
 {
   "feedback": {
     "rating": number (0-10),
@@ -74,10 +82,11 @@ Provide output in JSON format ONLY:
   "next_question": "the next question to ask"
 }
 
-Adapt difficulty based on the answer quality.
-If the answer is weak, ask probing questions.
-If strong, ask about trade-offs, scalability, or edge cases.
-Cover topics: Architecture, Database, Security, Testing, Performance.`;
+Other Instructions:
+1. Adapt difficulty based on the answer quality.
+2. If the answer is weak, ask probing questions.
+3. If strong, ask about trade-offs, scalability, or edge cases.
+4. Cover topics: Architecture, Database, Security, Testing, Performance.`;
 
     const responseText = await this.callOllama(prompt, true);
 

@@ -59,7 +59,7 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
+export const serve = async (initialPort?: number): Promise<number> => {
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -82,14 +82,34 @@ app.use((req, res, next) => {
 
   // Serve the app on the port specified in the environment variable PORT
   // Default to 5001 to avoid conflicts with AirPlay (port 5000)
-  const port = parseInt(process.env.PORT || "5001", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
-})();
+  const startPort = initialPort || parseInt(process.env.PORT || "5001", 10);
+  
+  const tryListen = (port: number): Promise<number> => {
+    return new Promise((resolve, reject) => {
+      const server = httpServer.listen({ port, host: "0.0.0.0" }, () => {
+        log(`serving on port ${port}`);
+        resolve(port);
+      });
+
+      server.on('error', (err: any) => {
+        if (err.code === 'EADDRINUSE') {
+          log(`Port ${port} in use, trying ${port + 1}`);
+          server.close(); // Ensure we close the failed handle (though usually it's not open)
+          resolve(tryListen(port + 1));
+        } else {
+          reject(err);
+        }
+      });
+    });
+  };
+
+  return tryListen(startPort);
+};
+
+// Auto-start if run directly (development or standalone production)
+if (process.env.NODE_ENV !== "production" || !process.env.MANUAL_START) {
+  serve().catch(err => {
+    console.error("Failed to start server:", err);
+    process.exit(1);
+  });
+}
