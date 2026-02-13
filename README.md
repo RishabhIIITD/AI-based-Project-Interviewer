@@ -5,7 +5,20 @@
 [![React](https://img.shields.io/badge/React-20232A?style=flat&logo=react&logoColor=61DAFB)](https://reactjs.org/)
 [![Electron](https://img.shields.io/badge/Electron-47848F?style=flat&logo=electron&logoColor=white)](https://www.electronjs.org/)
 
-**upGrad Interviewer** is a sophisticated, AI-powered technical interview simulator designed to bridge the gap between learning and employment. It offers students and professionals a realistic platform to practice both project-based and subject-specific interviews with real-time feedback and comprehensive performance analytics.
+**upGrad Interviewer** is a versatile, AI-powered educational platform designed for **In-class** and **Post-class** environments. It serves as a dual-purpose tool: an **AI Interviewer** for concept validation and a **Project Interviewer** for technical depth assessment. By providing a realistic simulation of technical discussions, it helps students reinforce classroom learning and prepare for real-world professional evaluations with real-time feedback and comprehensive analytics.
+
+---
+
+## 🎓 Educational Workflows
+
+### 🏫 In-Class Validation (AI Interviewer)
+Used during live sessions to instantly verify if students have grasped the core concepts. It provides an interactive way for instructors to gauge class understanding and for students to identify immediate knowledge gaps.
+
+### 🏠 Post-Class Mastery (AI Interviewer)
+Students can use the tool after class to practice real-world interview scenarios. By utilizing the detailed feedback and ratings provided after each session, they can refine their technical communication and deepen their understanding of subject matter.
+
+### 🏗️ Post-Project Readiness (Project Interviewer)
+Designed to be used any time after a project is completed. This module prepares students for rigorous project defense and technical interviews by simulating deep-dive questions into their architecture, tech stack, and implementation choices.
 
 ---
 
